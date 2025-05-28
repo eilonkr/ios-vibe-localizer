@@ -7,6 +7,13 @@ inputs:
     description: 'Path to the AppStrings.swift file.'
     required: false
     default: 'AppStrings.swift'
+  target_languages:
+    description: 'Comma-separated list of language codes to translate into (e.g., es,fr,de).'
+    required: true
+  localization_files_directory:
+    description: 'Directory where .lproj folders are located/should be created.'
+    required: false
+    default: '.' # Defaults to the root, assuming .lproj folders are there or alongside AppStrings.swift
 
 runs:
   using: 'node16' # Or node20 if you prefer
