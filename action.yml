@@ -14,6 +14,34 @@ inputs:
     description: 'Directory where .lproj folders are located/should be created.'
     required: false
     default: '.' # Defaults to the root, assuming .lproj folders are there or alongside AppStrings.swift
+  github_token:
+    description: 'GitHub token for creating branches and pull requests.'
+    required: false # Typically true for this operation, but default can be used
+    default: ${{ secrets.GITHUB_TOKEN }}
+  pr_branch_prefix:
+    description: 'Prefix for the pull request branch name.'
+    required: false
+    default: 'ios-localizer-updates/'
+  commit_user_name:
+    description: 'Name for git commit user.'
+    required: false
+    default: 'github-actions[bot]'
+  commit_user_email:
+    description: 'Email for git commit user.'
+    required: false
+    default: 'github-actions[bot]@users.noreply.github.com'
+  commit_message:
+    description: 'Commit message for localization updates.'
+    required: false
+    default: 'i18n: Update translations by iOS Localizer Action'
+  pr_title:
+    description: 'Title for the pull request.'
+    required: false
+    default: 'iOS Localizer: Automated Localization Updates'
+  pr_body:
+    description: 'Body content for the pull request.'
+    required: false
+    default: 'Automated localization updates by the iOS Localizer Action.'
 
 runs:
   using: 'node16' # Or node20 if you prefer

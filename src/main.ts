@@ -129,25 +129,105 @@ async function run(): Promise<void> {
       // or if .strings files are missing entirely.
     }
 
-    // For now, we consider all currentStrings as the source for .strings files,
-    // ensuring all keys in AppStrings.swift are present in each Localizable.strings file.
-    // The generateStringsFileContent function will use mock translations for new/modified ones.
+    // Track if any .strings files were actually changed or created
+    let filesChanged = false;
+    const changedFilesList: string[] = [];
 
     for (const lang of targetLanguages) {
       const lprojPath = path.join(localizationDir, `${lang}.lproj`);
       const stringsFilePath = path.join(lprojPath, 'Localizable.strings');
       core.info(`Processing ${stringsFilePath}`);
 
-      const existingTranslations = readLocalizationFile(stringsFilePath);
+      const originalContent = fs.existsSync(stringsFilePath) ? fs.readFileSync(stringsFilePath, 'utf-8') : null;
+      const existingTranslations = readLocalizationFile(stringsFilePath); // This needs to be called before generate, ensures directory exists for read
       
-      // The generateStringsFileContent will use currentStrings as the master list.
-      // It will take values from existingTranslations if they exist and are not considered outdated by its internal logic.
-      // For keys in currentStrings but not in existingTranslations (or new/modified), it generates mocks.
       const newContent = generateStringsFileContent(existingTranslations, currentStrings, lang);
-      writeLocalizationFile(stringsFilePath, newContent);
+      
+      if (originalContent !== newContent) {
+        writeLocalizationFile(stringsFilePath, newContent);
+        core.info(`Changes written to ${stringsFilePath}`);
+        filesChanged = true;
+        changedFilesList.push(stringsFilePath); // Track relative path
+      } else {
+        core.info(`No changes needed for ${stringsFilePath}`);
+      }
     }
 
-    core.info('Localization process completed with mock translations.');
+    if (filesChanged) {
+      core.info('Localization files were updated. Proceeding to create a PR.');
+      core.info(`Files changed: ${changedFilesList.join(', ')}`);
+
+      const token = core.getInput('github_token', { required: true });
+      const branchPrefix = core.getInput('pr_branch_prefix', { required: false });
+      const commitUserName = core.getInput('commit_user_name', { required: false });
+      const commitUserEmail = core.getInput('commit_user_email', { required: false });
+      const commitMessage = core.getInput('commit_message', { required: false });
+      const prTitle = core.getInput('pr_title', { required: false });
+      let prBody = core.getInput('pr_body', { required: false });
+
+      // Configure git
+      await exec.exec('git', ['config', '--global', 'user.name', commitUserName]);
+      await exec.exec('git', ['config', '--global', 'user.email', commitUserEmail]);
+
+      const newBranchName = `${branchPrefix}${context.eventName}-${context.runId}-${Date.now()}`.replace(/\//g, '-');
+      core.info(`Creating new branch: ${newBranchName}`);
+      await exec.exec('git', ['checkout', '-b', newBranchName]);
+
+      core.info('Adding files to commit...');
+      // Add all changed .strings files. We need to be careful with paths if localizationDir is not '.'
+      // The changedFilesList contains paths relative to the repo root if localizationDir is used correctly with path.join
+      for (const file of changedFilesList) {
+        await exec.exec('git', ['add', file]);
+      }
+      
+      core.info('Committing changes...');
+      await exec.exec('git', ['commit', '-m', commitMessage]);
+
+      core.info('Pushing new branch...');
+      await exec.exec('git', ['push', '-u', 'origin', newBranchName]);
+
+      const octokit = github.getOctokit(token);
+      const repoOwner = context.repo.owner;
+      const repoName = context.repo.repo;
+      
+      let baseBranchForPR = context.ref.replace('refs/heads/', '');
+      if (context.eventName === 'pull_request') {
+        baseBranchForPR = context.payload.pull_request?.base.ref;
+        if (!baseBranchForPR) {
+            core.setFailed('Could not determine base branch from pull request context for PR creation.');
+            return;
+        }
+      }
+      core.info(`Base branch for PR will be: ${baseBranchForPR}`);
+      
+      prBody += `\n\nUpdated files:\n- ${changedFilesList.join('\n- ')}`;
+
+      core.info(`Creating pull request: ${prTitle}`);
+      try {
+        const response = await octokit.rest.pulls.create({
+          owner: repoOwner,
+          repo: repoName,
+          title: prTitle,
+          head: newBranchName,
+          base: baseBranchForPR, // Target the branch the workflow was triggered from
+          body: prBody,
+          draft: false
+        });
+        core.info(`Pull request created: ${response.data.html_url}`);
+      } catch (e: any) {
+        core.error('Error creating pull request:');
+        if (e.response) {
+          core.error(`Status: ${e.response.status}`);
+          core.error(`Data: ${JSON.stringify(e.response.data)}`);
+        }
+        core.setFailed(e.message);
+      }
+
+    } else {
+      core.info('No localization files were changed. Skipping PR creation.');
+    }
+
+    core.info('Localization process completed.');
 
   } catch (error) {
     if (error instanceof Error) {
