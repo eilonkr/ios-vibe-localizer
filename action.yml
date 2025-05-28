@@ -15,9 +15,8 @@ inputs:
     required: false
     default: '.' # Defaults to the root, assuming .lproj folders are there or alongside AppStrings.swift
   github_token:
-    description: 'GitHub token for creating branches and pull requests.'
-    required: false # Typically true for this operation, but default can be used
-    default: ${{ secrets.GITHUB_TOKEN }}
+    description: 'GitHub token for creating branches and pull requests. Must have contents:write and pull-requests:write permissions.'
+    required: true
   pr_branch_prefix:
     description: 'Prefix for the pull request branch name.'
     required: false
