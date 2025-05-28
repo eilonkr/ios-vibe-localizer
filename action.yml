@@ -2,6 +2,12 @@ name: 'iOS Localizer Test Action'
 description: 'Prints a test message.'
 author: 'eilonkr' # Using your GitHub username
 
+inputs:
+  app_strings_file_path:
+    description: 'Path to the AppStrings.swift file.'
+    required: false
+    default: 'AppStrings.swift'
+
 runs:
   using: 'node16' # Or node20 if you prefer
   main: 'dist/index.js'
