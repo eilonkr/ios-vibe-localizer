@@ -35899,6 +35899,16 @@ const core = __importStar(__nccwpck_require__(7484));
 const fs = __importStar(__nccwpck_require__(9896));
 const localizationManager_1 = __nccwpck_require__(5711);
 const githubService_1 = __nccwpck_require__(2345); // Import functions from githubService
+/**
+ * Formats JSON to match Xcode's xcstrings formatting style with spaces before colons.
+ * @param obj The object to stringify
+ * @returns Formatted JSON string matching Xcode's style
+ */
+function formatXcstringsJson(obj) {
+    const jsonString = JSON.stringify(obj, null, 2);
+    // Replace all occurrences of "key": with "key" : (space before colon)
+    return jsonString.replace(/("(?:[^"\\]|\\.)*")\s*:/g, '$1 :');
+}
 async function run() {
     var _a, _b;
     try {
@@ -36009,7 +36019,7 @@ async function run() {
         const changedFilesList = [];
         if (xcstringsModified) {
             try {
-                fs.writeFileSync(xcstringsFilePath, JSON.stringify(currentXcstringsData, null, 2));
+                fs.writeFileSync(xcstringsFilePath, formatXcstringsJson(currentXcstringsData));
                 core.info(`Changes written to ${xcstringsFilePath}`);
                 changedFilesList.push(xcstringsFilePath);
             }
@@ -36170,7 +36180,6 @@ class OpenAIService {
             required: ["translations"],
             additionalProperties: false
         };
-        // Create the prompt with all strings to translate
         const stringsToTranslate = requests.map(req => `Key: "${req.key}"\nText: "${req.text}"`).join('\n\n');
         const systemPrompt = `You are a professional translator. Translate the following strings from ${sourceLanguage} to the specified target languages: ${allTargetLanguages.join(', ')}.
 

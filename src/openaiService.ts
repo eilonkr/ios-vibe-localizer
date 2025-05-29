@@ -82,7 +82,6 @@ export class OpenAIService {
       additionalProperties: false
     };
 
-    // Create the prompt with all strings to translate
     const stringsToTranslate = requests.map(req => `Key: "${req.key}"\nText: "${req.text}"`).join('\n\n');
     
     const systemPrompt = `You are a professional translator. Translate the following strings from ${sourceLanguage} to the specified target languages: ${allTargetLanguages.join(', ')}.

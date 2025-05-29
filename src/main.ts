@@ -4,6 +4,17 @@ import { fetchBatchTranslations } from './localizationManager';
 import { XCStrings, TranslationRequest } from './types';
 import { createPullRequest, getShaRefs, getFileContentAtCommit, PrConfig } from './githubService'; // Import functions from githubService
 
+/**
+ * Formats JSON to match Xcode's xcstrings formatting style with spaces before colons.
+ * @param obj The object to stringify
+ * @returns Formatted JSON string matching Xcode's style
+ */
+function formatXcstringsJson(obj: any): string {
+  const jsonString = JSON.stringify(obj, null, 2);
+  // Replace all occurrences of "key": with "key" : (space before colon)
+  return jsonString.replace(/("(?:[^"\\]|\\.)*")\s*:/g, '$1 :');
+}
+
 async function run(): Promise<void> {
   try {
     // Input gathering
@@ -134,7 +145,7 @@ async function run(): Promise<void> {
 
     if (xcstringsModified) {
       try {
-        fs.writeFileSync(xcstringsFilePath, JSON.stringify(currentXcstringsData, null, 2));
+        fs.writeFileSync(xcstringsFilePath, formatXcstringsJson(currentXcstringsData));
         core.info(`Changes written to ${xcstringsFilePath}`);
         changedFilesList.push(xcstringsFilePath);
       } catch (e:any) {
