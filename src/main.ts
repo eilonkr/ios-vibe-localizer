@@ -54,13 +54,22 @@ async function run(): Promise<void> {
 
     // Collect all strings that need translation
     const translationRequests: TranslationRequest[] = [];
-    const translationChanges: { added: string[]; updated: string[];} = { added: [], updated: [] };
+    const translationChanges: { added: string[]; updated: string[]; staleRemoved: string[]; } = { added: [], updated: [], staleRemoved: [] };
     const stringTranslationMap: Map<string, { languages: string[], isNew: Map<string, boolean> }> = new Map();
+    let xcstringsModified = false;
 
     for (const key in currentXcstringsData.strings) {
       const currentStringEntry = currentXcstringsData.strings[key];
       if (!currentStringEntry.localizations) {
         currentStringEntry.localizations = {};
+      }
+
+      // Check for and remove stale extraction state
+      if (currentStringEntry.extractionState === 'stale') {
+        delete currentStringEntry.extractionState;
+        xcstringsModified = true;
+        translationChanges.staleRemoved.push(key);
+        core.info(`Removed stale extraction state from: ${key}`);
       }
 
       const languagesNeeded: string[] = [];
@@ -93,8 +102,6 @@ async function run(): Promise<void> {
         stringTranslationMap.set(key, { languages: languagesNeeded, isNew: isNewMap });
       }
     }
-
-    let xcstringsModified = false;
 
     if (translationRequests.length > 0) {
       core.info(`Found ${translationRequests.length} strings requiring translation. Processing in batch...`);
@@ -138,7 +145,10 @@ async function run(): Promise<void> {
     if (translationChanges.updated.length > 0) {
       core.info(`Updated translations for ${translationChanges.updated.length} strings: ${translationChanges.updated.join(', ')}`);
     }
-    if (translationChanges.added.length === 0 && translationChanges.updated.length === 0) {
+    if (translationChanges.staleRemoved.length > 0) {
+      core.info(`Removed stale extraction state from ${translationChanges.staleRemoved.length} strings: ${translationChanges.staleRemoved.join(', ')}`);
+    }
+    if (translationChanges.added.length === 0 && translationChanges.updated.length === 0 && translationChanges.staleRemoved.length === 0) {
       core.info('No new strings requiring translation found in ' + xcstringsFilePath);
     }
     
@@ -157,7 +167,6 @@ async function run(): Promise<void> {
       core.info(`No changes needed for ${xcstringsFilePath}`);
     }
 
-    // Git operations and PR creation
     if (changedFilesList.length > 0) {
       core.info(`Localization file ${xcstringsFilePath} was updated. Proceeding to create a PR.`);
 
@@ -177,20 +186,22 @@ async function run(): Promise<void> {
       core.info('No localization files were changed. Skipping PR creation.');
     }
 
-    // Summary of action results
     core.info('');
     core.info('=== Action Summary ===');
     core.info(`Files processed: ${xcstringsFilePath}`);
     core.info(`Target languages: ${targetLanguages.join(', ')}`);
     core.info(`OpenAI model used: ${openaiModel}`);
     
-    if (translationChanges.added.length > 0 || translationChanges.updated.length > 0) {
+    if (translationChanges.added.length > 0 || translationChanges.updated.length > 0 || translationChanges.staleRemoved.length > 0) {
       core.info(`Translation changes:`);
       if (translationChanges.added.length > 0) {
         core.info(`  - Added: ${translationChanges.added.length} translations`);
       }
       if (translationChanges.updated.length > 0) {
         core.info(`  - Updated: ${translationChanges.updated.length} translations`);
+      }
+      if (translationChanges.staleRemoved.length > 0) {
+        core.info(`  - Removed stale extraction state from: ${translationChanges.staleRemoved.length} strings`);
       }
     } else {
       core.info(`Translation changes: None`);
@@ -216,4 +227,4 @@ async function run(): Promise<void> {
   }
 }
 
-run(); 
+run();
