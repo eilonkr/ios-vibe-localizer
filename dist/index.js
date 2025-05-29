@@ -36064,7 +36064,7 @@ class OpenAIService {
                     { role: 'system', content: `Translate the following text from ${sourceLanguage} to ${targetLanguage}. Only return the translated text, without any additional explanations, formatting, or conversational fluff. If you cannot perform the translation, return the original text.` },
                     { role: 'user', content: text }
                 ],
-                model: 'gpt-3.5-turbo', // Or any other suitable model
+                model: 'gpt-4o-mini',
             });
             const translatedText = (_c = (_b = (_a = chatCompletion.choices[0]) === null || _a === void 0 ? void 0 : _a.message) === null || _b === void 0 ? void 0 : _b.content) === null || _c === void 0 ? void 0 : _c.trim();
             if (!translatedText) {

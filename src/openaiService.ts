@@ -45,7 +45,7 @@ export class OpenAIService {
           { role: 'system', content: `Translate the following text from ${sourceLanguage} to ${targetLanguage}. Only return the translated text, without any additional explanations, formatting, or conversational fluff. If you cannot perform the translation, return the original text.` },
           { role: 'user', content: text }
         ],
-        model: 'gpt-3.5-turbo', // Or any other suitable model
+        model: 'gpt-4o-mini',
       });
 
       const translatedText = chatCompletion.choices[0]?.message?.content?.trim();
