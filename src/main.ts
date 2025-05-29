@@ -21,9 +21,11 @@ async function run(): Promise<void> {
     const xcstringsFilePath = core.getInput('xcstrings_file_path', { required: false }) || 'Localizable.xcstrings';
     const targetLanguagesInput = core.getInput('target_languages', { required: true });
     const targetLanguages = targetLanguagesInput.split(',').map(lang => lang.trim()).filter(lang => lang);
+    const openaiModel = core.getInput('openai_model', { required: false }) || 'gpt-4o-mini';
 
     core.info(`XCStrings file: ${xcstringsFilePath}`);
     core.info(`Target languages: ${targetLanguages.join(', ')}`);
+    core.info(`OpenAI model: ${openaiModel}`);
 
     if (targetLanguages.length === 0) {
       core.setFailed('No target languages specified.');
@@ -99,7 +101,7 @@ async function run(): Promise<void> {
       core.info(`Found ${translationRequests.length} strings requiring translation. Processing in batch...`);
       
       // Perform batch translation
-      const batchResponse = await fetchBatchTranslations(translationRequests, currentXcstringsData.sourceLanguage);
+      const batchResponse = await fetchBatchTranslations(translationRequests, currentXcstringsData.sourceLanguage, openaiModel);
       
       // Apply the translations to the xcstrings data
       for (const translationResult of batchResponse.translations) {

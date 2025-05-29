@@ -19,10 +19,13 @@ if (OPENAI_API_KEY) {
 }
 
 export class OpenAIService {
-  constructor() {
+  private model: string;
+
+  constructor(model: string) {
     if (!openai) {
       throw new Error('OpenAI client is not initialized. Please ensure OPENAI_API_KEY environment variable is set with a valid API key.');
     }
+    this.model = model;
   }
 
   /**
@@ -94,7 +97,7 @@ Return the translations in the exact JSON structure specified.`;
 
     try {
       const chatCompletion = await openai.chat.completions.create({
-        model: 'gpt-4o-mini',
+        model: this.model,
         messages: [
           { role: 'system', content: systemPrompt },
           { role: 'user', content: userPrompt }
