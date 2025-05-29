@@ -11,13 +11,12 @@ import { createPullRequest, getShaRefs, getFileContentAtCommit, PrConfig } from 
  */
 function formatXcstringsJson(obj: any): string {
   const jsonString = JSON.stringify(obj, null, 2);
-  // Replace all occurrences of "key": with "key" : (space before colon)
+  // Align with Xcode's xcstrings format style
   return jsonString.replace(/("(?:[^"\\]|\\.)*")\s*:/g, '$1 :');
 }
 
 async function run(): Promise<void> {
   try {
-    // Input gathering
     const xcstringsFilePath = core.getInput('xcstrings_file_path', { required: false }) || 'Localizable.xcstrings';
     const targetLanguagesInput = core.getInput('target_languages', { required: true });
     const targetLanguages = targetLanguagesInput.split(',').map(lang => lang.trim()).filter(lang => lang);
@@ -177,6 +176,34 @@ async function run(): Promise<void> {
     } else {
       core.info('No localization files were changed. Skipping PR creation.');
     }
+
+    // Summary of action results
+    core.info('');
+    core.info('=== Action Summary ===');
+    core.info(`Files processed: ${xcstringsFilePath}`);
+    core.info(`Target languages: ${targetLanguages.join(', ')}`);
+    core.info(`OpenAI model used: ${openaiModel}`);
+    
+    if (translationChanges.added.length > 0 || translationChanges.updated.length > 0) {
+      core.info(`Translation changes:`);
+      if (translationChanges.added.length > 0) {
+        core.info(`  - Added: ${translationChanges.added.length} translations`);
+      }
+      if (translationChanges.updated.length > 0) {
+        core.info(`  - Updated: ${translationChanges.updated.length} translations`);
+      }
+    } else {
+      core.info(`Translation changes: None`);
+    }
+    
+    if (changedFilesList.length > 0) {
+      core.info(`Files modified: ${changedFilesList.join(', ')}`);
+      core.info(`Pull request: Created for localization updates`);
+    } else {
+      core.info(`Files modified: None`);
+      core.info(`Pull request: Not created (no changes)`);
+    }
+    core.info('======================');
 
     core.info('Localization process completed.');
 
