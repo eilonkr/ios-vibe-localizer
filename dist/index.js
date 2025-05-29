@@ -35631,6 +35631,167 @@ function wrappy (fn, cb) {
 
 /***/ }),
 
+/***/ 2345:
+/***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
+
+"use strict";
+
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.createPullRequest = createPullRequest;
+exports.getShaRefs = getShaRefs;
+exports.getFileContentAtCommit = getFileContentAtCommit;
+const core = __importStar(__nccwpck_require__(7484));
+const github = __importStar(__nccwpck_require__(3228));
+const exec = __importStar(__nccwpck_require__(5236));
+async function createPullRequest(xcstringsFilePath, changedFilesList, token, prConfig) {
+    var _a;
+    const context = github.context;
+    // Configure git
+    await exec.exec('git', ['config', '--global', 'user.name', prConfig.commitUserName]);
+    await exec.exec('git', ['config', '--global', 'user.email', prConfig.commitUserEmail]);
+    const newBranchName = `${prConfig.branchPrefix}${context.eventName}-${context.runId}-${Date.now()}`.replace(/\//g, '-');
+    core.info(`Creating new branch: ${newBranchName}`);
+    await exec.exec('git', ['checkout', '-b', newBranchName]);
+    core.info('Adding file to commit...');
+    await exec.exec('git', ['add', xcstringsFilePath]);
+    core.info('Committing changes...');
+    await exec.exec('git', ['commit', '-m', prConfig.commitMessage]);
+    core.info('Pushing new branch...');
+    await exec.exec('git', ['push', '-u', 'origin', newBranchName]);
+    const octokit = github.getOctokit(token);
+    const repoOwner = context.repo.owner;
+    const repoName = context.repo.repo;
+    let baseBranchForPR = context.ref.replace('refs/heads/', '');
+    if (context.eventName === 'pull_request') {
+        baseBranchForPR = (_a = context.payload.pull_request) === null || _a === void 0 ? void 0 : _a.base.ref;
+        if (!baseBranchForPR) {
+            core.setFailed('Could not determine base branch from pull request context for PR creation.');
+            return;
+        }
+    }
+    core.info(`Base branch for PR will be: ${baseBranchForPR}`);
+    let finalPrBody = prConfig.prBody;
+    if (changedFilesList.length > 0) {
+        finalPrBody += `\n\nUpdated files:\n- ${changedFilesList.join('\n- ')}`;
+    }
+    core.info(`Creating pull request: ${prConfig.prTitle}`);
+    try {
+        const response = await octokit.rest.pulls.create({
+            owner: repoOwner,
+            repo: repoName,
+            title: prConfig.prTitle,
+            head: newBranchName,
+            base: baseBranchForPR,
+            body: finalPrBody,
+            draft: false
+        });
+        core.info(`Pull request created: ${response.data.html_url}`);
+    }
+    catch (e) {
+        core.error('Error creating pull request:');
+        if (e.response) {
+            core.error(`Status: ${e.response.status}`);
+            core.error(`Data: ${JSON.stringify(e.response.data)}`);
+        }
+        core.setFailed(e.message);
+    }
+}
+async function getShaRefs() {
+    var _a, _b, _c, _d;
+    const context = github.context;
+    let baseSha = '';
+    let headSha = '';
+    switch (context.eventName) {
+        case 'pull_request':
+            baseSha = (_a = context.payload.pull_request) === null || _a === void 0 ? void 0 : _a.base.sha;
+            headSha = (_b = context.payload.pull_request) === null || _b === void 0 ? void 0 : _b.head.sha;
+            break;
+        case 'push':
+            baseSha = context.payload.before;
+            headSha = context.payload.after;
+            if (/^0+$/.test(baseSha)) {
+                core.info('New branch push detected. Comparing against parent of HEAD.');
+                const firstCommitSha = (_d = (_c = context.payload.commits) === null || _c === void 0 ? void 0 : _c[0]) === null || _d === void 0 ? void 0 : _d.id;
+                if (firstCommitSha) {
+                    try {
+                        let parentShaOutput = '';
+                        await exec.exec('git', ['rev-parse', `${firstCommitSha}^`], {
+                            listeners: { stdout: (data) => { parentShaOutput += data.toString(); } },
+                            ignoreReturnCode: true
+                        });
+                        baseSha = parentShaOutput.trim();
+                        if (!baseSha)
+                            core.warning("Could not determine parent SHA for new branch's first commit.");
+                    }
+                    catch (e) {
+                        core.warning(`Could not get parent of first commit ${firstCommitSha} for new branch: ${e.message}`);
+                    }
+                }
+                else {
+                    core.warning('Could not determine first commit SHA for new branch push with zero base SHA.');
+                }
+            }
+            break;
+        default:
+            throw new Error(`Unsupported event: ${context.eventName}.`);
+    }
+    if (!baseSha || !headSha || /^0+$/.test(headSha)) {
+        throw new Error(`Could not determine valid base or head SHA. Base: '${baseSha}', Head: '${headSha}'.`);
+    }
+    return { baseSha, headSha };
+}
+async function getFileContentAtCommit(sha, filePath) {
+    let content = '';
+    const options = {};
+    options.listeners = {
+        stdout: (data) => { content += data.toString(); },
+        stderr: (data) => { core.error(data.toString()); }
+    };
+    options.ignoreReturnCode = true;
+    const exitCode = await exec.exec('git', ['show', `${sha}:${filePath}`], options);
+    if (exitCode !== 0) {
+        core.warning(`File ${filePath} not found at commit ${sha} or git show failed.`);
+        return null;
+    }
+    return content;
+}
+
+
+/***/ }),
+
 /***/ 5711:
 /***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
 
@@ -35670,20 +35831,9 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.generateMockTranslation = generateMockTranslation;
 exports.fetchRealTranslation = fetchRealTranslation;
 const core = __importStar(__nccwpck_require__(7484));
 const openaiService_1 = __nccwpck_require__(2053);
-/**
- * Generates a mock translation string for a given key and language code.
- * @param key The original string key (source language string).
- * @param languageCode The target language code (e.g., "de", "es").
- * @returns A mock translated string in the format "[languageCode] key".
- */
-function generateMockTranslation(key, languageCode) {
-    core.info(`Generating mock translation for key "${key}" in language "${languageCode}".`);
-    return `[${languageCode}] ${key}`;
-}
 /**
  * Fetches a real translation for a given key and language code using OpenAI.
  * @param key The original string key (source language string).
@@ -35700,8 +35850,7 @@ async function fetchRealTranslation(key, targetLanguageCode, sourceLanguageCode 
     }
     catch (error) {
         core.error(`Error fetching real translation for key "${key}": ${error instanceof Error ? error.message : String(error)}`);
-        // Fallback to mock translation in case of error
-        return generateMockTranslation(key, targetLanguageCode) + " (fallback due to error)";
+        throw error; // Propagate the error instead of falling back to mock translation
     }
 }
 
@@ -35748,91 +35897,28 @@ var __importStar = (this && this.__importStar) || (function () {
 })();
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 const core = __importStar(__nccwpck_require__(7484));
-const github = __importStar(__nccwpck_require__(3228));
-const exec = __importStar(__nccwpck_require__(5236));
 const fs = __importStar(__nccwpck_require__(9896));
 const localizationManager_1 = __nccwpck_require__(5711);
-async function getFileContentAtCommit(sha, filePath) {
-    let content = '';
-    const options = {};
-    options.listeners = {
-        stdout: (data) => { content += data.toString(); },
-        stderr: (data) => { core.error(data.toString()); }
-    };
-    options.ignoreReturnCode = true; // We need to check the exit code to see if the file exists
-    // Ensure GITHUB_TOKEN has permissions to read contents
-    // This command shows the content of the file at a specific commit
-    const exitCode = await exec.exec('git', ['show', `${sha}:${filePath}`], options);
-    if (exitCode !== 0) {
-        core.warning(`File ${filePath} not found at commit ${sha} or git show failed.`);
-        return null;
-    }
-    return content;
-}
+const githubService_1 = __nccwpck_require__(2345); // Import functions from githubService
 async function run() {
-    var _a, _b, _c, _d, _e, _f, _g;
+    var _a, _b;
     try {
+        // Input gathering
         const xcstringsFilePath = core.getInput('xcstrings_file_path', { required: false }) || 'Localizable.xcstrings';
         const targetLanguagesInput = core.getInput('target_languages', { required: true });
         const targetLanguages = targetLanguagesInput.split(',').map(lang => lang.trim()).filter(lang => lang);
-        // const localizationDir = core.getInput('localization_files_directory', { required: false }) || '.'; // No longer needed
         core.info(`XCStrings file: ${xcstringsFilePath}`);
         core.info(`Target languages: ${targetLanguages.join(', ')}`);
-        // core.info(`Localization directory: ${localizationDir}`); // No longer needed
         if (targetLanguages.length === 0) {
             core.setFailed('No target languages specified.');
             return;
         }
-        const context = github.context;
-        let baseSha = '';
-        let headSha = '';
-        switch (context.eventName) {
-            case 'pull_request':
-                baseSha = (_a = context.payload.pull_request) === null || _a === void 0 ? void 0 : _a.base.sha;
-                headSha = (_b = context.payload.pull_request) === null || _b === void 0 ? void 0 : _b.head.sha;
-                break;
-            case 'push':
-                baseSha = context.payload.before;
-                headSha = context.payload.after;
-                // For push to new branch, context.payload.before is all zeros
-                if (/^0+$/.test(baseSha)) {
-                    core.info(`New branch push detected. Comparing against parent of HEAD.`);
-                    // Attempt to get the parent of the first commit in the push if baseSha is 0000... (new branch)
-                    // This is a common scenario for new branches. We diff against the parent of the first commit.
-                    // Note: This might not cover all edge cases for new branches perfectly.
-                    // A more robust solution might involve finding the common ancestor with the target branch if applicable.
-                    const firstCommitSha = (_d = (_c = context.payload.commits) === null || _c === void 0 ? void 0 : _c[0]) === null || _d === void 0 ? void 0 : _d.id;
-                    if (firstCommitSha) {
-                        try {
-                            let parentShaOutput = '';
-                            await exec.exec('git', ['rev-parse', `${firstCommitSha}^`], {
-                                listeners: { stdout: (data) => { parentShaOutput += data.toString(); } },
-                                ignoreReturnCode: true
-                            });
-                            baseSha = parentShaOutput.trim();
-                            if (!baseSha)
-                                core.warning("Could not determine parent SHA for new branch's first commit.");
-                        }
-                        catch (e) {
-                            core.warning(`Could not get parent of first commit ${firstCommitSha} for new branch: ${e.message}`);
-                        }
-                    }
-                    else {
-                        core.warning('Could not determine first commit SHA for new branch push with zero base SHA.');
-                    }
-                }
-                break;
-            default:
-                core.setFailed(`Unsupported event: ${context.eventName}.`);
-                return;
-        }
-        if (!baseSha || !headSha || /^0+$/.test(headSha)) { // headSha can be all zeros if branch is deleted
-            core.setFailed(`Could not determine valid base or head SHA. Base: '${baseSha}', Head: '${headSha}'.`);
-            return;
-        }
+        // SHA determination
+        const { baseSha, headSha } = await (0, githubService_1.getShaRefs)();
         core.info(`Base SHA: ${baseSha}`);
         core.info(`Head SHA: ${headSha}`);
-        const currentXcstringsFileContent = await getFileContentAtCommit(headSha, xcstringsFilePath);
+        // File processing and translation
+        const currentXcstringsFileContent = await (0, githubService_1.getFileContentAtCommit)(headSha, xcstringsFilePath);
         if (currentXcstringsFileContent === null) {
             core.setFailed(`Could not read ${xcstringsFilePath} at HEAD commit ${headSha}.`);
             return;
@@ -35846,54 +35932,54 @@ async function run() {
             return;
         }
         core.info(`Successfully parsed ${xcstringsFilePath} from HEAD. Found ${Object.keys(currentXcstringsData.strings).length} string keys.`);
-        const stringsToMockTranslate = []; // Store keys of strings that need mock translation
+        const translationChanges = { added: [], updated: [] };
         let xcstringsModified = false;
         for (const key in currentXcstringsData.strings) {
             const currentStringEntry = currentXcstringsData.strings[key];
             if (!currentStringEntry.localizations) {
-                currentStringEntry.localizations = {}; // Initialize if completely new string from Xcode
+                currentStringEntry.localizations = {};
             }
             for (const lang of targetLanguages) {
                 const needsTranslationForLang = !currentStringEntry.localizations[lang] ||
-                    !((_e = currentStringEntry.localizations[lang]) === null || _e === void 0 ? void 0 : _e.stringUnit) ||
-                    !((_f = currentStringEntry.localizations[lang]) === null || _f === void 0 ? void 0 : _f.stringUnit.value);
+                    !((_a = currentStringEntry.localizations[lang]) === null || _a === void 0 ? void 0 : _a.stringUnit) ||
+                    !((_b = currentStringEntry.localizations[lang]) === null || _b === void 0 ? void 0 : _b.stringUnit.value);
                 if (needsTranslationForLang) {
+                    const isNewTranslation = !currentStringEntry.localizations[lang];
                     core.info(`String key "${key}" needs translation for language "${lang}". Fetching real translation.`);
                     if (!currentStringEntry.localizations[lang]) {
-                        currentStringEntry.localizations[lang] = { stringUnit: { state: 'translated', value: '' } }; // Initialize structure
+                        currentStringEntry.localizations[lang] = { stringUnit: { state: 'translated', value: '' } };
                     }
-                    // Use the new fetchRealTranslation function
                     const translatedValue = await (0, localizationManager_1.fetchRealTranslation)(key, lang, currentXcstringsData.sourceLanguage);
                     currentStringEntry.localizations[lang].stringUnit = {
-                        state: "translated", // Or a custom state like "needs_review"
+                        state: "translated",
                         value: translatedValue
                     };
                     xcstringsModified = true;
-                    if (!stringsToMockTranslate.includes(key)) { // This logic might need adjustment based on how we want to report
-                        stringsToMockTranslate.push(key);
+                    const changeKey = `${key} (${lang})`;
+                    if (isNewTranslation) {
+                        translationChanges.added.push(changeKey);
+                    }
+                    else {
+                        translationChanges.updated.push(changeKey);
                     }
                 }
             }
         }
-        if (stringsToMockTranslate.length > 0) {
-            core.info(`Found ${stringsToMockTranslate.length} string keys requiring translations: ${stringsToMockTranslate.join(', ')}`);
+        if (translationChanges.added.length > 0) {
+            core.info(`Added translations for ${translationChanges.added.length} strings: ${translationChanges.added.join(', ')}`);
         }
-        else {
-            core.info('No new strings requiring mock translation found in ' + xcstringsFilePath);
+        if (translationChanges.updated.length > 0) {
+            core.info(`Updated translations for ${translationChanges.updated.length} strings: ${translationChanges.updated.join(', ')}`);
         }
-        // Track if any .strings files were actually changed or created -> now only one xcstrings file
-        const changedFilesList = []; // Will contain only xcstringsFilePath if modified
+        if (translationChanges.added.length === 0 && translationChanges.updated.length === 0) {
+            core.info('No new strings requiring translation found in ' + xcstringsFilePath);
+        }
+        const changedFilesList = [];
         if (xcstringsModified) {
             try {
-                // Ensure the directory for xcstringsFilePath exists (it should, as we read from it)
-                // but good practice if the path could be arbitrary, though not the case here.
-                // const outputDir = path.dirname(xcstringsFilePath);
-                // if (!fs.existsSync(outputDir)) {
-                //   fs.mkdirSync(outputDir, { recursive: true });
-                // }
                 fs.writeFileSync(xcstringsFilePath, JSON.stringify(currentXcstringsData, null, 2));
                 core.info(`Changes written to ${xcstringsFilePath}`);
-                changedFilesList.push(xcstringsFilePath); // Track relative path
+                changedFilesList.push(xcstringsFilePath);
             }
             catch (e) {
                 core.setFailed(`Error writing updated ${xcstringsFilePath}: ${e.message}`);
@@ -35903,62 +35989,19 @@ async function run() {
         else {
             core.info(`No changes needed for ${xcstringsFilePath}`);
         }
-        if (changedFilesList.length > 0) { // Replaces old 'filesChanged' logic
+        // Git operations and PR creation
+        if (changedFilesList.length > 0) {
             core.info(`Localization file ${xcstringsFilePath} was updated. Proceeding to create a PR.`);
-            // core.info(`Files changed: ${changedFilesList.join(', ')}`); // Now only one file
             const token = core.getInput('github_token', { required: true });
-            const branchPrefix = core.getInput('pr_branch_prefix', { required: false });
-            const commitUserName = core.getInput('commit_user_name', { required: false });
-            const commitUserEmail = core.getInput('commit_user_email', { required: false });
-            const commitMessage = core.getInput('commit_message', { required: false });
-            const prTitle = core.getInput('pr_title', { required: false });
-            let prBody = core.getInput('pr_body', { required: false });
-            // Configure git
-            await exec.exec('git', ['config', '--global', 'user.name', commitUserName]);
-            await exec.exec('git', ['config', '--global', 'user.email', commitUserEmail]);
-            const newBranchName = `${branchPrefix}${context.eventName}-${context.runId}-${Date.now()}`.replace(/\//g, '-');
-            core.info(`Creating new branch: ${newBranchName}`);
-            await exec.exec('git', ['checkout', '-b', newBranchName]);
-            core.info('Adding file to commit...');
-            await exec.exec('git', ['add', xcstringsFilePath]); // Only one file
-            core.info('Committing changes...');
-            await exec.exec('git', ['commit', '-m', commitMessage]);
-            core.info('Pushing new branch...');
-            await exec.exec('git', ['push', '-u', 'origin', newBranchName]);
-            const octokit = github.getOctokit(token);
-            const repoOwner = context.repo.owner;
-            const repoName = context.repo.repo;
-            let baseBranchForPR = context.ref.replace('refs/heads/', '');
-            if (context.eventName === 'pull_request') {
-                baseBranchForPR = (_g = context.payload.pull_request) === null || _g === void 0 ? void 0 : _g.base.ref;
-                if (!baseBranchForPR) {
-                    core.setFailed('Could not determine base branch from pull request context for PR creation.');
-                    return;
-                }
-            }
-            core.info(`Base branch for PR will be: ${baseBranchForPR}`);
-            prBody += `\n\nUpdated files:\n- ${changedFilesList.join('\n- ')}`;
-            core.info(`Creating pull request: ${prTitle}`);
-            try {
-                const response = await octokit.rest.pulls.create({
-                    owner: repoOwner,
-                    repo: repoName,
-                    title: prTitle,
-                    head: newBranchName,
-                    base: baseBranchForPR,
-                    body: prBody, // prBody was already updated with changedFilesList
-                    draft: false
-                });
-                core.info(`Pull request created: ${response.data.html_url}`);
-            }
-            catch (e) {
-                core.error('Error creating pull request:');
-                if (e.response) {
-                    core.error(`Status: ${e.response.status}`);
-                    core.error(`Data: ${JSON.stringify(e.response.data)}`);
-                }
-                core.setFailed(e.message);
-            }
+            const prConfig = {
+                branchPrefix: core.getInput('pr_branch_prefix', { required: false }) || 'localization/',
+                commitUserName: core.getInput('commit_user_name', { required: false }) || 'github-actions[bot]',
+                commitUserEmail: core.getInput('commit_user_email', { required: false }) || 'github-actions[bot]@users.noreply.github.com',
+                commitMessage: core.getInput('commit_message', { required: false }) || 'i18n: Update translations',
+                prTitle: core.getInput('pr_title', { required: false }) || 'New Translations Added',
+                prBody: core.getInput('pr_body', { required: false }) || 'Automated PR with new translations.'
+            };
+            await (0, githubService_1.createPullRequest)(xcstringsFilePath, changedFilesList, token, prConfig);
         }
         else {
             core.info('No localization files were changed. Skipping PR creation.');
@@ -36041,7 +36084,7 @@ else {
 class OpenAIService {
     constructor() {
         if (!openai) {
-            core.warning('OpenAI client is not initialized. This might be due to a missing API key. Real translations will not be available.');
+            throw new Error('OpenAI client is not initialized. Please ensure OPENAI_API_KEY environment variable is set with a valid API key.');
         }
     }
     /**
@@ -36054,8 +36097,7 @@ class OpenAIService {
     async getTranslation(text, targetLanguage, sourceLanguage = "en") {
         var _a, _b, _c;
         if (!openai) {
-            core.warning(`OpenAI client not initialized. Returning mock translation for text: "${text}" to ${targetLanguage}.`);
-            return `[${targetLanguage}] ${text} (mock - OpenAI not configured)`;
+            throw new Error('OpenAI client not initialized. Please ensure OPENAI_API_KEY environment variable is set with a valid API key.');
         }
         core.info(`Requesting translation for: "${text}" from ${sourceLanguage} to ${targetLanguage}`);
         try {

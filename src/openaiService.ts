@@ -20,7 +20,7 @@ if (OPENAI_API_KEY) {
 export class OpenAIService {
   constructor() {
     if (!openai) {
-      core.warning('OpenAI client is not initialized. This might be due to a missing API key. Real translations will not be available.');
+      throw new Error('OpenAI client is not initialized. Please ensure OPENAI_API_KEY environment variable is set with a valid API key.');
     }
   }
 
@@ -33,8 +33,7 @@ export class OpenAIService {
    */
   async getTranslation(text: string, targetLanguage: string, sourceLanguage: string = "en"): Promise<string> {
     if (!openai) {
-      core.warning(`OpenAI client not initialized. Returning mock translation for text: "${text}" to ${targetLanguage}.`);
-      return `[${targetLanguage}] ${text} (mock - OpenAI not configured)`;
+      throw new Error('OpenAI client not initialized. Please ensure OPENAI_API_KEY environment variable is set with a valid API key.');
     }
 
     core.info(`Requesting translation for: "${text}" from ${sourceLanguage} to ${targetLanguage}`);
