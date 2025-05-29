@@ -2,9 +2,30 @@ import * as core from '@actions/core';
 import * as github from '@actions/github';
 import * as exec from '@actions/exec';
 import * as fs from 'fs';
-import * as path from 'path';
-import { parseAppStrings } from './appStringsParser';
-import { readLocalizationFile, generateStringsFileContent, writeLocalizationFile } from './localizationManager';
+// import *path from 'path'; // No longer needed directly in main.ts for path.join for .lproj
+import { generateMockTranslation } from './localizationManager';
+// Imports for appStringsParser and localizationManager will be removed or changed later
+// import { parseAppStrings } from './appStringsParser';
+// import { readLocalizationFile, generateStringsFileContent, writeLocalizationFile } from './localizationManager';
+
+// Define the structure for XCStrings content (simplified)
+interface XCStrings {
+  sourceLanguage: string;
+  strings: {
+    [key: string]: {
+      comment?: string;
+      localizations?: {
+        [lang: string]: {
+          stringUnit: {
+            state: string;
+            value: string;
+          };
+        };
+      };
+    };
+  };
+  version: string;
+}
 
 async function getFileContentAtCommit(sha: string, filePath: string): Promise<string | null> {
   let content = '';
@@ -27,14 +48,14 @@ async function getFileContentAtCommit(sha: string, filePath: string): Promise<st
 
 async function run(): Promise<void> {
   try {
-    const appStringsFilePath = core.getInput('app_strings_file_path', { required: false }) || 'AppStrings.swift';
+    const xcstringsFilePath = core.getInput('xcstrings_file_path', { required: false }) || 'Localizable.xcstrings';
     const targetLanguagesInput = core.getInput('target_languages', { required: true });
     const targetLanguages = targetLanguagesInput.split(',').map(lang => lang.trim()).filter(lang => lang);
-    const localizationDir = core.getInput('localization_files_directory', { required: false }) || '.';
+    // const localizationDir = core.getInput('localization_files_directory', { required: false }) || '.'; // No longer needed
 
-    core.info(`AppStrings file: ${appStringsFilePath}`);
+    core.info(`XCStrings file: ${xcstringsFilePath}`);
     core.info(`Target languages: ${targetLanguages.join(', ')}`);
-    core.info(`Localization directory: ${localizationDir}`);
+    // core.info(`Localization directory: ${localizationDir}`); // No longer needed
 
     if (targetLanguages.length === 0) {
       core.setFailed('No target languages specified.');
@@ -91,71 +112,85 @@ async function run(): Promise<void> {
     core.info(`Base SHA: ${baseSha}`);
     core.info(`Head SHA: ${headSha}`);
 
-    const currentAppStringsContent = await getFileContentAtCommit(headSha, appStringsFilePath);
-    if (currentAppStringsContent === null) {
-      core.setFailed(`Could not read ${appStringsFilePath} at HEAD commit ${headSha}.`);
+    const currentXcstringsFileContent = await getFileContentAtCommit(headSha, xcstringsFilePath);
+    if (currentXcstringsFileContent === null) {
+      core.setFailed(`Could not read ${xcstringsFilePath} at HEAD commit ${headSha}.`);
       return;
     }
-    const currentStrings = parseAppStrings(currentAppStringsContent);
-    core.info(`Found ${Object.keys(currentStrings).length} strings in current ${appStringsFilePath}`);
+    
+    let currentXcstringsData: XCStrings;
+    try {
+      currentXcstringsData = JSON.parse(currentXcstringsFileContent);
+    } catch (e: any) {
+      core.setFailed(`Failed to parse ${xcstringsFilePath} from HEAD commit ${headSha}: ${e.message}`);
+      return;
+    }
+    core.info(`Successfully parsed ${xcstringsFilePath} from HEAD. Found ${Object.keys(currentXcstringsData.strings).length} string keys.`);
 
-    let previousStrings: Record<string, string> = {};
-    if (!/^0+$/.test(baseSha)) { // Don't try to read from a zero SHA (e.g., initial commit to new branch)
-        const previousAppStringsContent = await getFileContentAtCommit(baseSha, appStringsFilePath);
-        if (previousAppStringsContent !== null) {
-            previousStrings = parseAppStrings(previousAppStringsContent);
-            core.info(`Found ${Object.keys(previousStrings).length} strings in previous ${appStringsFilePath} at ${baseSha}`);
-        } else {
-            core.info(`${appStringsFilePath} not found at base commit ${baseSha}. Assuming all current strings are new.`);
+    const stringsToMockTranslate: string[] = []; // Store keys of strings that need mock translation
+    let xcstringsModified = false;
+
+    for (const key in currentXcstringsData.strings) {
+      const currentStringEntry = currentXcstringsData.strings[key];
+      if (!currentStringEntry.localizations) {
+        currentStringEntry.localizations = {}; // Initialize if completely new string from Xcode
+      }
+
+      for (const lang of targetLanguages) {
+        const needsTranslationForLang = 
+          !currentStringEntry.localizations[lang] || 
+          !currentStringEntry.localizations[lang]?.stringUnit ||
+          !currentStringEntry.localizations[lang]?.stringUnit.value;
+
+        if (needsTranslationForLang) {
+          core.info(`String key "${key}" needs mock translation for language "${lang}".`);
+          if (!currentStringEntry.localizations[lang]) {
+            currentStringEntry.localizations[lang] = { stringUnit: { state: 'translated', value: '' } }; // Initialize structure
+          }
+          currentStringEntry.localizations[lang]!.stringUnit = {
+            state: "translated", // Or a custom state like "needs_review"
+            value: generateMockTranslation(key, lang) // Use the imported function
+          };
+          xcstringsModified = true;
+          if (!stringsToMockTranslate.includes(key)) {
+            stringsToMockTranslate.push(key);
+          }
         }
+      }
+    }
+
+    if (stringsToMockTranslate.length > 0) {
+      core.info(`Found ${stringsToMockTranslate.length} string keys requiring mock translations: ${stringsToMockTranslate.join(', ')}`);
     } else {
-        core.info(`Base SHA is zero (${baseSha}), assuming all current strings in ${appStringsFilePath} are new.`);
+      core.info('No new strings requiring mock translation found in ' + xcstringsFilePath);
     }
+    
+    // Track if any .strings files were actually changed or created -> now only one xcstrings file
+    const changedFilesList: string[] = []; // Will contain only xcstringsFilePath if modified
 
-    const stringsToTranslate: Record<string, string> = {};
-    let changesDetected = false;
-    for (const key in currentStrings) {
-      if (!previousStrings[key] || previousStrings[key] !== currentStrings[key]) {
-        stringsToTranslate[key] = currentStrings[key];
-        core.info(`Change detected for key "${key}": value "${currentStrings[key]}" (previously: "${previousStrings[key] || '[not present]'}")`);
-        changesDetected = true;
+    if (xcstringsModified) {
+      try {
+        // Ensure the directory for xcstringsFilePath exists (it should, as we read from it)
+        // but good practice if the path could be arbitrary, though not the case here.
+        // const outputDir = path.dirname(xcstringsFilePath);
+        // if (!fs.existsSync(outputDir)) {
+        //   fs.mkdirSync(outputDir, { recursive: true });
+        // }
+        fs.writeFileSync(xcstringsFilePath, JSON.stringify(currentXcstringsData, null, 2));
+        core.info(`Changes written to ${xcstringsFilePath}`);
+        changedFilesList.push(xcstringsFilePath); // Track relative path
+      } catch (e:any) {
+        core.setFailed(`Error writing updated ${xcstringsFilePath}: ${e.message}`);
+        return;
       }
+    } else {
+      core.info(`No changes needed for ${xcstringsFilePath}`);
     }
 
-    if (!changesDetected) {
-      core.info('No translatable changes detected in AppStrings.swift.');
-      // Even if no changes to AppStrings.swift, we might need to update .strings files
-      // if AppStrings.swift has keys not present in them (e.g. a new language was added)
-      // or if .strings files are missing entirely.
-    }
 
-    // Track if any .strings files were actually changed or created
-    let filesChanged = false;
-    const changedFilesList: string[] = [];
-
-    for (const lang of targetLanguages) {
-      const lprojPath = path.join(localizationDir, `${lang}.lproj`);
-      const stringsFilePath = path.join(lprojPath, 'Localizable.strings');
-      core.info(`Processing ${stringsFilePath}`);
-
-      const originalContent = fs.existsSync(stringsFilePath) ? fs.readFileSync(stringsFilePath, 'utf-8') : null;
-      const existingTranslations = readLocalizationFile(stringsFilePath); // This needs to be called before generate, ensures directory exists for read
-      
-      const newContent = generateStringsFileContent(existingTranslations, currentStrings, lang);
-      
-      if (originalContent !== newContent) {
-        writeLocalizationFile(stringsFilePath, newContent);
-        core.info(`Changes written to ${stringsFilePath}`);
-        filesChanged = true;
-        changedFilesList.push(stringsFilePath); // Track relative path
-      } else {
-        core.info(`No changes needed for ${stringsFilePath}`);
-      }
-    }
-
-    if (filesChanged) {
-      core.info('Localization files were updated. Proceeding to create a PR.');
-      core.info(`Files changed: ${changedFilesList.join(', ')}`);
+    if (changedFilesList.length > 0) { // Replaces old 'filesChanged' logic
+      core.info(`Localization file ${xcstringsFilePath} was updated. Proceeding to create a PR.`);
+      // core.info(`Files changed: ${changedFilesList.join(', ')}`); // Now only one file
 
       const token = core.getInput('github_token', { required: true });
       const branchPrefix = core.getInput('pr_branch_prefix', { required: false });
@@ -173,12 +208,8 @@ async function run(): Promise<void> {
       core.info(`Creating new branch: ${newBranchName}`);
       await exec.exec('git', ['checkout', '-b', newBranchName]);
 
-      core.info('Adding files to commit...');
-      // Add all changed .strings files. We need to be careful with paths if localizationDir is not '.'
-      // The changedFilesList contains paths relative to the repo root if localizationDir is used correctly with path.join
-      for (const file of changedFilesList) {
-        await exec.exec('git', ['add', file]);
-      }
+      core.info('Adding file to commit...');
+      await exec.exec('git', ['add', xcstringsFilePath]); // Only one file
       
       core.info('Committing changes...');
       await exec.exec('git', ['commit', '-m', commitMessage]);
@@ -209,8 +240,8 @@ async function run(): Promise<void> {
           repo: repoName,
           title: prTitle,
           head: newBranchName,
-          base: baseBranchForPR, // Target the branch the workflow was triggered from
-          body: prBody,
+          base: baseBranchForPR,
+          body: prBody, // prBody was already updated with changedFilesList
           draft: false
         });
         core.info(`Pull request created: ${response.data.html_url}`);

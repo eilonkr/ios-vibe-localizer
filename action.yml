@@ -3,17 +3,13 @@ description: 'Prints a test message.'
 author: 'eilonkr' # Using your GitHub username
 
 inputs:
-  app_strings_file_path:
-    description: 'Path to the AppStrings.swift file.'
+  xcstrings_file_path:
+    description: 'Path to the Localizable.xcstrings file.'
     required: false
-    default: 'AppStrings.swift'
+    default: 'Localizable.xcstrings'
   target_languages:
     description: 'Comma-separated list of language codes to translate into (e.g., es,fr,de).'
     required: true
-  localization_files_directory:
-    description: 'Directory where .lproj folders are located/should be created.'
-    required: false
-    default: '.' # Defaults to the root, assuming .lproj folders are there or alongside AppStrings.swift
   github_token:
     description: 'GitHub token for creating branches and pull requests. Must have contents:write and pull-requests:write permissions.'
     required: true
