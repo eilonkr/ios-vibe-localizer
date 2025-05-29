@@ -2,11 +2,7 @@ import * as core from '@actions/core';
 import * as github from '@actions/github';
 import * as exec from '@actions/exec';
 import * as fs from 'fs';
-// import *path from 'path'; // No longer needed directly in main.ts for path.join for .lproj
-import { generateMockTranslation } from './localizationManager';
-// Imports for appStringsParser and localizationManager will be removed or changed later
-// import { parseAppStrings } from './appStringsParser';
-// import { readLocalizationFile, generateStringsFileContent, writeLocalizationFile } from './localizationManager';
+import { generateMockTranslation, fetchRealTranslation } from './localizationManager';
 
 // Define the structure for XCStrings content (simplified)
 interface XCStrings {
@@ -143,16 +139,18 @@ async function run(): Promise<void> {
           !currentStringEntry.localizations[lang]?.stringUnit.value;
 
         if (needsTranslationForLang) {
-          core.info(`String key "${key}" needs mock translation for language "${lang}".`);
+          core.info(`String key "${key}" needs translation for language "${lang}". Fetching real translation.`);
           if (!currentStringEntry.localizations[lang]) {
             currentStringEntry.localizations[lang] = { stringUnit: { state: 'translated', value: '' } }; // Initialize structure
           }
+          // Use the new fetchRealTranslation function
+          const translatedValue = await fetchRealTranslation(key, lang, currentXcstringsData.sourceLanguage);
           currentStringEntry.localizations[lang]!.stringUnit = {
             state: "translated", // Or a custom state like "needs_review"
-            value: generateMockTranslation(key, lang) // Use the imported function
+            value: translatedValue
           };
           xcstringsModified = true;
-          if (!stringsToMockTranslate.includes(key)) {
+          if (!stringsToMockTranslate.includes(key)) { // This logic might need adjustment based on how we want to report
             stringsToMockTranslate.push(key);
           }
         }
@@ -160,7 +158,7 @@ async function run(): Promise<void> {
     }
 
     if (stringsToMockTranslate.length > 0) {
-      core.info(`Found ${stringsToMockTranslate.length} string keys requiring mock translations: ${stringsToMockTranslate.join(', ')}`);
+      core.info(`Found ${stringsToMockTranslate.length} string keys requiring translations: ${stringsToMockTranslate.join(', ')}`);
     } else {
       core.info('No new strings requiring mock translation found in ' + xcstringsFilePath);
     }
