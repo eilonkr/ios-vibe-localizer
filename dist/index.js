@@ -35831,26 +35831,25 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.fetchRealTranslation = fetchRealTranslation;
+exports.fetchBatchTranslations = fetchBatchTranslations;
 const core = __importStar(__nccwpck_require__(7484));
 const openaiService_1 = __nccwpck_require__(2053);
 /**
- * Fetches a real translation for a given key and language code using OpenAI.
- * @param key The original string key (source language string).
- * @param targetLanguageCode The target language code (e.g., "de", "es").
+ * Fetches real translations for multiple strings in a single batch API call.
+ * @param requests Array of translation requests.
  * @param sourceLanguageCode The source language code (e.g., "en").
- * @returns A promise that resolves to the translated string.
+ * @returns A promise that resolves to the batch translation response.
  */
-async function fetchRealTranslation(key, targetLanguageCode, sourceLanguageCode = "en") {
-    core.info(`Fetching real translation for key "${key}" from ${sourceLanguageCode} to ${targetLanguageCode}.`);
+async function fetchBatchTranslations(requests, sourceLanguageCode = "en") {
+    core.info(`Fetching batch translations for ${requests.length} strings from ${sourceLanguageCode}.`);
     const openaiService = new openaiService_1.OpenAIService();
     try {
-        const translation = await openaiService.getTranslation(key, targetLanguageCode, sourceLanguageCode);
-        return translation;
+        const batchResponse = await openaiService.getBatchTranslations(requests, sourceLanguageCode);
+        return batchResponse;
     }
     catch (error) {
-        core.error(`Error fetching real translation for key "${key}": ${error instanceof Error ? error.message : String(error)}`);
-        throw error; // Propagate the error instead of falling back to mock translation
+        core.error(`Error fetching batch translations: ${error instanceof Error ? error.message : String(error)}`);
+        throw error;
     }
 }
 
@@ -35932,35 +35931,68 @@ async function run() {
             return;
         }
         core.info(`Successfully parsed ${xcstringsFilePath} from HEAD. Found ${Object.keys(currentXcstringsData.strings).length} string keys.`);
+        // Collect all strings that need translation
+        const translationRequests = [];
         const translationChanges = { added: [], updated: [] };
-        let xcstringsModified = false;
+        const stringTranslationMap = new Map();
         for (const key in currentXcstringsData.strings) {
             const currentStringEntry = currentXcstringsData.strings[key];
             if (!currentStringEntry.localizations) {
                 currentStringEntry.localizations = {};
             }
+            const languagesNeeded = [];
+            const isNewMap = new Map();
             for (const lang of targetLanguages) {
                 const needsTranslationForLang = !currentStringEntry.localizations[lang] ||
                     !((_a = currentStringEntry.localizations[lang]) === null || _a === void 0 ? void 0 : _a.stringUnit) ||
                     !((_b = currentStringEntry.localizations[lang]) === null || _b === void 0 ? void 0 : _b.stringUnit.value);
                 if (needsTranslationForLang) {
                     const isNewTranslation = !currentStringEntry.localizations[lang];
-                    core.info(`String key "${key}" needs translation for language "${lang}". Fetching real translation.`);
+                    languagesNeeded.push(lang);
+                    isNewMap.set(lang, isNewTranslation);
+                    // Initialize the structure if needed
                     if (!currentStringEntry.localizations[lang]) {
                         currentStringEntry.localizations[lang] = { stringUnit: { state: 'translated', value: '' } };
                     }
-                    const translatedValue = await (0, localizationManager_1.fetchRealTranslation)(key, lang, currentXcstringsData.sourceLanguage);
-                    currentStringEntry.localizations[lang].stringUnit = {
-                        state: "translated",
-                        value: translatedValue
-                    };
-                    xcstringsModified = true;
-                    const changeKey = `${key} (${lang})`;
-                    if (isNewTranslation) {
-                        translationChanges.added.push(changeKey);
-                    }
-                    else {
-                        translationChanges.updated.push(changeKey);
+                }
+            }
+            if (languagesNeeded.length > 0) {
+                translationRequests.push({
+                    key: key,
+                    text: key, // Using the key as the text to translate
+                    targetLanguages: languagesNeeded
+                });
+                stringTranslationMap.set(key, { languages: languagesNeeded, isNew: isNewMap });
+            }
+        }
+        let xcstringsModified = false;
+        if (translationRequests.length > 0) {
+            core.info(`Found ${translationRequests.length} strings requiring translation. Processing in batch...`);
+            // Perform batch translation
+            const batchResponse = await (0, localizationManager_1.fetchBatchTranslations)(translationRequests, currentXcstringsData.sourceLanguage);
+            // Apply the translations to the xcstrings data
+            for (const translationResult of batchResponse.translations) {
+                const key = translationResult.key;
+                const stringEntry = currentXcstringsData.strings[key];
+                const translationInfo = stringTranslationMap.get(key);
+                if (!stringEntry || !translationInfo) {
+                    core.warning(`Received translation for unknown key: ${key}`);
+                    continue;
+                }
+                for (const [lang, translatedValue] of Object.entries(translationResult.translations)) {
+                    if (translationInfo.languages.includes(lang)) {
+                        stringEntry.localizations[lang].stringUnit = {
+                            state: "translated",
+                            value: translatedValue
+                        };
+                        xcstringsModified = true;
+                        const changeKey = `${key} (${lang})`;
+                        if (translationInfo.isNew.get(lang)) {
+                            translationChanges.added.push(changeKey);
+                        }
+                        else {
+                            translationChanges.updated.push(changeKey);
+                        }
                     }
                 }
             }
@@ -36088,38 +36120,91 @@ class OpenAIService {
         }
     }
     /**
-     * Translates a given text to the target language using OpenAI.
-     * @param text The text to translate.
-     * @param targetLanguage The language code to translate to (e.g., "es", "de").
+     * Translates multiple strings to multiple target languages using OpenAI structured outputs in a single API call.
+     * @param requests Array of translation requests containing key, text, and target languages.
      * @param sourceLanguage The language code of the original text (e.g., "en").
-     * @returns A promise that resolves to the translated string.
+     * @returns A promise that resolves to the batch translation response.
      */
-    async getTranslation(text, targetLanguage, sourceLanguage = "en") {
-        var _a, _b, _c;
+    async getBatchTranslations(requests, sourceLanguage = "en") {
+        var _a, _b;
         if (!openai) {
             throw new Error('OpenAI client not initialized. Please ensure OPENAI_API_KEY environment variable is set with a valid API key.');
         }
-        core.info(`Requesting translation for: "${text}" from ${sourceLanguage} to ${targetLanguage}`);
+        if (requests.length === 0) {
+            return { translations: [] };
+        }
+        // Get all unique target languages from all requests
+        const allTargetLanguages = [...new Set(requests.flatMap(req => req.targetLanguages))];
+        core.info(`Requesting batch translation for ${requests.length} strings from ${sourceLanguage} to languages: ${allTargetLanguages.join(', ')}`);
+        // Create the schema for structured output
+        const translationSchema = {
+            type: "object",
+            properties: {
+                translations: {
+                    type: "array",
+                    items: {
+                        type: "object",
+                        properties: {
+                            key: {
+                                type: "string",
+                                description: "The original key/identifier for the string"
+                            },
+                            translations: {
+                                type: "object",
+                                properties: Object.fromEntries(allTargetLanguages.map(lang => [
+                                    lang,
+                                    {
+                                        type: "string",
+                                        description: `Translation in ${lang}`
+                                    }
+                                ])),
+                                required: allTargetLanguages,
+                                additionalProperties: false
+                            }
+                        },
+                        required: ["key", "translations"],
+                        additionalProperties: false
+                    }
+                }
+            },
+            required: ["translations"],
+            additionalProperties: false
+        };
+        // Create the prompt with all strings to translate
+        const stringsToTranslate = requests.map(req => `Key: "${req.key}"\nText: "${req.text}"`).join('\n\n');
+        const systemPrompt = `You are a professional translator. Translate the following strings from ${sourceLanguage} to the specified target languages: ${allTargetLanguages.join(', ')}.
+
+For each string, provide accurate, natural translations that preserve the meaning and context. If a string contains placeholders (like %@, %d, {0}, etc.), keep them exactly as they are in the translation.
+
+Return the translations in the exact JSON structure specified.`;
+        const userPrompt = `Translate these strings:\n\n${stringsToTranslate}`;
         try {
             const chatCompletion = await openai.chat.completions.create({
-                messages: [
-                    { role: 'system', content: `Translate the following text from ${sourceLanguage} to ${targetLanguage}. Only return the translated text, without any additional explanations, formatting, or conversational fluff. If you cannot perform the translation, return the original text.` },
-                    { role: 'user', content: text }
-                ],
                 model: 'gpt-4o-mini',
+                messages: [
+                    { role: 'system', content: systemPrompt },
+                    { role: 'user', content: userPrompt }
+                ],
+                response_format: {
+                    type: "json_schema",
+                    json_schema: {
+                        name: "batch_translation",
+                        schema: translationSchema,
+                        strict: true
+                    }
+                }
             });
-            const translatedText = (_c = (_b = (_a = chatCompletion.choices[0]) === null || _a === void 0 ? void 0 : _a.message) === null || _b === void 0 ? void 0 : _b.content) === null || _c === void 0 ? void 0 : _c.trim();
-            if (!translatedText) {
-                core.error(`Failed to translate text: "${text}". No content in response. Returning original text.`);
-                return text; // Fallback to original text if translation fails
+            const responseContent = (_b = (_a = chatCompletion.choices[0]) === null || _a === void 0 ? void 0 : _a.message) === null || _b === void 0 ? void 0 : _b.content;
+            if (!responseContent) {
+                throw new Error('No content in OpenAI response');
             }
-            core.info(`Received translation: "${translatedText}"`);
-            return translatedText;
+            const batchResponse = JSON.parse(responseContent);
+            core.info(`Received batch translations for ${batchResponse.translations.length} strings`);
+            return batchResponse;
         }
         catch (error) {
-            core.error(`Error translating text "${text}" to ${targetLanguage}: ${error instanceof Error ? error.message : String(error)}`);
-            // Fallback to the original text in case of an error during API call
-            return text;
+            core.error(`Error in batch translation: ${error instanceof Error ? error.message : String(error)}`);
+            throw error;
         }
     }
 }

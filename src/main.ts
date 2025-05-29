@@ -1,7 +1,7 @@
 import * as core from '@actions/core';
 import * as fs from 'fs';
-import { fetchRealTranslation } from './localizationManager';
-import { XCStrings } from './types';
+import { fetchBatchTranslations } from './localizationManager';
+import { XCStrings, TranslationRequest } from './types';
 import { createPullRequest, getShaRefs, getFileContentAtCommit, PrConfig } from './githubService'; // Import functions from githubService
 
 async function run(): Promise<void> {
@@ -40,14 +40,19 @@ async function run(): Promise<void> {
     }
     core.info(`Successfully parsed ${xcstringsFilePath} from HEAD. Found ${Object.keys(currentXcstringsData.strings).length} string keys.`);
 
+    // Collect all strings that need translation
+    const translationRequests: TranslationRequest[] = [];
     const translationChanges: { added: string[]; updated: string[];} = { added: [], updated: [] };
-    let xcstringsModified = false;
+    const stringTranslationMap: Map<string, { languages: string[], isNew: Map<string, boolean> }> = new Map();
 
     for (const key in currentXcstringsData.strings) {
       const currentStringEntry = currentXcstringsData.strings[key];
       if (!currentStringEntry.localizations) {
         currentStringEntry.localizations = {};
       }
+
+      const languagesNeeded: string[] = [];
+      const isNewMap: Map<string, boolean> = new Map();
 
       for (const lang of targetLanguages) {
         const needsTranslationForLang = 
@@ -57,24 +62,59 @@ async function run(): Promise<void> {
 
         if (needsTranslationForLang) {
           const isNewTranslation = !currentStringEntry.localizations[lang];
-          core.info(`String key "${key}" needs translation for language "${lang}". Fetching real translation.`);
+          languagesNeeded.push(lang);
+          isNewMap.set(lang, isNewTranslation);
           
+          // Initialize the structure if needed
           if (!currentStringEntry.localizations[lang]) {
             currentStringEntry.localizations[lang] = { stringUnit: { state: 'translated', value: '' } };
           }
-          
-          const translatedValue = await fetchRealTranslation(key, lang, currentXcstringsData.sourceLanguage);
-          currentStringEntry.localizations[lang]!.stringUnit = {
-            state: "translated",
-            value: translatedValue
-          };
-          xcstringsModified = true;
-          
-          const changeKey = `${key} (${lang})`;
-          if (isNewTranslation) {
-            translationChanges.added.push(changeKey);
-          } else {
-            translationChanges.updated.push(changeKey);
+        }
+      }
+
+      if (languagesNeeded.length > 0) {
+        translationRequests.push({
+          key: key,
+          text: key, // Using the key as the text to translate
+          targetLanguages: languagesNeeded
+        });
+        stringTranslationMap.set(key, { languages: languagesNeeded, isNew: isNewMap });
+      }
+    }
+
+    let xcstringsModified = false;
+
+    if (translationRequests.length > 0) {
+      core.info(`Found ${translationRequests.length} strings requiring translation. Processing in batch...`);
+      
+      // Perform batch translation
+      const batchResponse = await fetchBatchTranslations(translationRequests, currentXcstringsData.sourceLanguage);
+      
+      // Apply the translations to the xcstrings data
+      for (const translationResult of batchResponse.translations) {
+        const key = translationResult.key;
+        const stringEntry = currentXcstringsData.strings[key];
+        const translationInfo = stringTranslationMap.get(key);
+        
+        if (!stringEntry || !translationInfo) {
+          core.warning(`Received translation for unknown key: ${key}`);
+          continue;
+        }
+
+        for (const [lang, translatedValue] of Object.entries(translationResult.translations)) {
+          if (translationInfo.languages.includes(lang)) {
+            stringEntry.localizations![lang]!.stringUnit = {
+              state: "translated",
+              value: translatedValue
+            };
+            xcstringsModified = true;
+            
+            const changeKey = `${key} (${lang})`;
+            if (translationInfo.isNew.get(lang)) {
+              translationChanges.added.push(changeKey);
+            } else {
+              translationChanges.updated.push(changeKey);
+            }
           }
         }
       }

@@ -1,21 +1,21 @@
 import * as core from '@actions/core';
 import { OpenAIService } from './openaiService';
+import { TranslationRequest, BatchTranslationResponse } from './types';
 
 /**
- * Fetches a real translation for a given key and language code using OpenAI.
- * @param key The original string key (source language string).
- * @param targetLanguageCode The target language code (e.g., "de", "es").
+ * Fetches real translations for multiple strings in a single batch API call.
+ * @param requests Array of translation requests.
  * @param sourceLanguageCode The source language code (e.g., "en").
- * @returns A promise that resolves to the translated string.
+ * @returns A promise that resolves to the batch translation response.
  */
-export async function fetchRealTranslation(key: string, targetLanguageCode: string, sourceLanguageCode: string = "en"): Promise<string> {
-  core.info(`Fetching real translation for key "${key}" from ${sourceLanguageCode} to ${targetLanguageCode}.`);
+export async function fetchBatchTranslations(requests: TranslationRequest[], sourceLanguageCode: string = "en"): Promise<BatchTranslationResponse> {
+  core.info(`Fetching batch translations for ${requests.length} strings from ${sourceLanguageCode}.`);
   const openaiService = new OpenAIService();
   try {
-    const translation = await openaiService.getTranslation(key, targetLanguageCode, sourceLanguageCode);
-    return translation;
+    const batchResponse = await openaiService.getBatchTranslations(requests, sourceLanguageCode);
+    return batchResponse;
   } catch (error) {
-    core.error(`Error fetching real translation for key "${key}": ${error instanceof Error ? error.message : String(error)}`);
-    throw error; // Propagate the error instead of falling back to mock translation
+    core.error(`Error fetching batch translations: ${error instanceof Error ? error.message : String(error)}`);
+    throw error;
   }
 } 

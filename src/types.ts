@@ -14,4 +14,21 @@ export interface XCStrings {
     };
   };
   version: string;
+}
+
+export interface TranslationRequest {
+  key: string;
+  text: string;
+  targetLanguages: string[];
+}
+
+export interface TranslationResult {
+  key: string;
+  translations: {
+    [languageCode: string]: string;
+  };
+}
+
+export interface BatchTranslationResponse {
+  translations: TranslationResult[];
 } 

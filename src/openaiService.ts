@@ -1,5 +1,6 @@
 import * as core from '@actions/core';
 import OpenAI from 'openai';
+import { TranslationRequest, BatchTranslationResponse } from './types';
 
 /**
  * Placeholder for OpenAI API key.
@@ -25,42 +26,103 @@ export class OpenAIService {
   }
 
   /**
-   * Translates a given text to the target language using OpenAI.
-   * @param text The text to translate.
-   * @param targetLanguage The language code to translate to (e.g., "es", "de").
+   * Translates multiple strings to multiple target languages using OpenAI structured outputs in a single API call.
+   * @param requests Array of translation requests containing key, text, and target languages.
    * @param sourceLanguage The language code of the original text (e.g., "en").
-   * @returns A promise that resolves to the translated string.
+   * @returns A promise that resolves to the batch translation response.
    */
-  async getTranslation(text: string, targetLanguage: string, sourceLanguage: string = "en"): Promise<string> {
+  async getBatchTranslations(requests: TranslationRequest[], sourceLanguage: string = "en"): Promise<BatchTranslationResponse> {
     if (!openai) {
       throw new Error('OpenAI client not initialized. Please ensure OPENAI_API_KEY environment variable is set with a valid API key.');
     }
 
-    core.info(`Requesting translation for: "${text}" from ${sourceLanguage} to ${targetLanguage}`);
+    if (requests.length === 0) {
+      return { translations: [] };
+    }
+
+    // Get all unique target languages from all requests
+    const allTargetLanguages = [...new Set(requests.flatMap(req => req.targetLanguages))];
+    
+    core.info(`Requesting batch translation for ${requests.length} strings from ${sourceLanguage} to languages: ${allTargetLanguages.join(', ')}`);
+
+    // Create the schema for structured output
+    const translationSchema = {
+      type: "object",
+      properties: {
+        translations: {
+          type: "array",
+          items: {
+            type: "object",
+            properties: {
+              key: {
+                type: "string",
+                description: "The original key/identifier for the string"
+              },
+              translations: {
+                type: "object",
+                properties: Object.fromEntries(
+                  allTargetLanguages.map(lang => [
+                    lang,
+                    {
+                      type: "string",
+                      description: `Translation in ${lang}`
+                    }
+                  ])
+                ),
+                required: allTargetLanguages,
+                additionalProperties: false
+              }
+            },
+            required: ["key", "translations"],
+            additionalProperties: false
+          }
+        }
+      },
+      required: ["translations"],
+      additionalProperties: false
+    };
+
+    // Create the prompt with all strings to translate
+    const stringsToTranslate = requests.map(req => `Key: "${req.key}"\nText: "${req.text}"`).join('\n\n');
+    
+    const systemPrompt = `You are a professional translator. Translate the following strings from ${sourceLanguage} to the specified target languages: ${allTargetLanguages.join(', ')}.
+
+For each string, provide accurate, natural translations that preserve the meaning and context. If a string contains placeholders (like %@, %d, {0}, etc.), keep them exactly as they are in the translation.
+
+Return the translations in the exact JSON structure specified.`;
+
+    const userPrompt = `Translate these strings:\n\n${stringsToTranslate}`;
 
     try {
       const chatCompletion = await openai.chat.completions.create({
-        messages: [
-          { role: 'system', content: `Translate the following text from ${sourceLanguage} to ${targetLanguage}. Only return the translated text, without any additional explanations, formatting, or conversational fluff. If you cannot perform the translation, return the original text.` },
-          { role: 'user', content: text }
-        ],
         model: 'gpt-4o-mini',
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userPrompt }
+        ],
+        response_format: {
+          type: "json_schema",
+          json_schema: {
+            name: "batch_translation",
+            schema: translationSchema,
+            strict: true
+          }
+        }
       });
 
-      const translatedText = chatCompletion.choices[0]?.message?.content?.trim();
-
-      if (!translatedText) {
-        core.error(`Failed to translate text: "${text}". No content in response. Returning original text.`);
-        return text; // Fallback to original text if translation fails
+      const responseContent = chatCompletion.choices[0]?.message?.content;
+      if (!responseContent) {
+        throw new Error('No content in OpenAI response');
       }
 
-      core.info(`Received translation: "${translatedText}"`);
-      return translatedText;
+      const batchResponse: BatchTranslationResponse = JSON.parse(responseContent);
+      
+      core.info(`Received batch translations for ${batchResponse.translations.length} strings`);
+      return batchResponse;
 
     } catch (error) {
-      core.error(`Error translating text "${text}" to ${targetLanguage}: ${error instanceof Error ? error.message : String(error)}`);
-      // Fallback to the original text in case of an error during API call
-      return text;
+      core.error(`Error in batch translation: ${error instanceof Error ? error.message : String(error)}`);
+      throw error;
     }
   }
 } 
