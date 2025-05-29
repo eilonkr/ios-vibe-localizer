@@ -1,6 +1,6 @@
 name: 'iOS Localizer Test Action'
 description: 'Prints a test message.'
-author: 'eilonkr' # Using your GitHub username
+author: 'iOS Localizer'
 
 inputs:
   xcstrings_file_path:
