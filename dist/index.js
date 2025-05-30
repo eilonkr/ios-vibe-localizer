@@ -35950,10 +35950,11 @@ async function run() {
                 currentStringEntry.localizations = {};
             }
             if (currentStringEntry.extractionState === 'stale') {
-                delete currentStringEntry.extractionState;
+                delete currentXcstringsData.strings[key];
                 xcstringsModified = true;
                 translationChanges.staleRemoved.push(key);
-                core.info(`Removed stale extraction state from: ${key}`);
+                core.info(`Removed stale string entry: ${key}`);
+                continue;
             }
             const languagesNeeded = [];
             const isNewMap = new Map();
