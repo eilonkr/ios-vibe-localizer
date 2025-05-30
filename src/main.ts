@@ -43,6 +43,41 @@ async function run(): Promise<void> {
         core.setFailed('Xcode scheme is required when run_xcode_build is true.');
         return;
       }
+      
+      // Find xcodebuild path
+      let xcodebuildPath = 'xcodebuild';
+      try {
+        let whichOutput = '';
+        await exec.exec('which', ['xcodebuild'], {
+          listeners: {
+            stdout: (data: Buffer) => {
+              whichOutput += data.toString();
+            }
+          }
+        });
+        xcodebuildPath = whichOutput.trim();
+        core.info(`Found xcodebuild at: ${xcodebuildPath}`);
+      } catch (e: any) {
+        // Try common paths
+        const commonPaths = ['/usr/bin/xcodebuild', '/Applications/Xcode.app/Contents/Developer/usr/bin/xcodebuild'];
+        let found = false;
+        for (const path of commonPaths) {
+          try {
+            await exec.exec('test', ['-f', path]);
+            xcodebuildPath = path;
+            found = true;
+            core.info(`Found xcodebuild at: ${xcodebuildPath}`);
+            break;
+          } catch {
+            // Continue to next path
+          }
+        }
+        if (!found) {
+          core.setFailed('xcodebuild not found. This action requires a macOS runner with Xcode installed.');
+          return;
+        }
+      }
+      
       try {
         const xcodebuildArgs = [
           '-project', xcodeProjectPath,
@@ -53,8 +88,8 @@ async function run(): Promise<void> {
           'CODE_SIGNING_ALLOWED=NO',
           'COMPILER_INDEX_STORE_ENABLE=NO'
         ];
-        core.info(`Executing: xcodebuild ${xcodebuildArgs.join(' ')}`);
-        await exec.exec('xcodebuild', xcodebuildArgs);
+        core.info(`Executing: ${xcodebuildPath} ${xcodebuildArgs.join(' ')}`);
+        await exec.exec(xcodebuildPath, xcodebuildArgs);
         core.info('Xcode build completed successfully.');
       } catch (e: any) {
         core.setFailed(`Xcode build failed: ${e.message}`);
