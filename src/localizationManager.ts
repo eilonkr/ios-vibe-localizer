@@ -3,7 +3,7 @@ import { OpenAIService } from './openaiService';
 import { TranslationRequest, BatchTranslationResponse } from './types';
 
 /**
- * Fetches real translations for multiple strings in a single batch API call.
+ * Fetches translations for multiple strings in a single batch API call.
  * @param requests Array of translation requests.
  * @param sourceLanguageCode The source language code (e.g., "en").
  * @param model The OpenAI model to use for translations.

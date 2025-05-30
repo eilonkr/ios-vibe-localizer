@@ -3,6 +3,24 @@ description: 'Prints a test message.'
 author: 'iOS Localizer'
 
 inputs:
+  run_xcode_build:
+    description: 'Whether to run an Xcode build before localization to refresh xcstrings.'
+    required: false
+    default: 'true'
+  xcode_project_path:
+    description: 'Path to your Xcode project (e.g., YourApp.xcodeproj). Required if run_xcode_build is true.'
+    required: false
+  xcode_scheme:
+    description: 'Xcode scheme to build. Required if run_xcode_build is true.'
+    required: false
+  xcode_configuration:
+    description: 'Xcode build configuration (e.g., Debug, Release).'
+    required: false
+    default: 'Release'
+  xcode_sdk:
+    description: 'Xcode SDK to use for the build (e.g., iphoneos, iphonesimulator).'
+    required: false
+    default: 'iphonesimulator'
   xcstrings_file_path:
     description: 'Path to the Localizable.xcstrings file.'
     required: false

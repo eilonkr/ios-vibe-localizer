@@ -35679,7 +35679,6 @@ const exec = __importStar(__nccwpck_require__(5236));
 async function createPullRequest(xcstringsFilePath, changedFilesList, token, prConfig) {
     var _a;
     const context = github.context;
-    // Configure git
     await exec.exec('git', ['config', '--global', 'user.name', prConfig.commitUserName]);
     await exec.exec('git', ['config', '--global', 'user.email', prConfig.commitUserEmail]);
     const newBranchName = `${prConfig.branchPrefix}${context.eventName}-${context.runId}-${Date.now()}`.replace(/\//g, '-');
@@ -35835,14 +35834,15 @@ exports.fetchBatchTranslations = fetchBatchTranslations;
 const core = __importStar(__nccwpck_require__(7484));
 const openaiService_1 = __nccwpck_require__(2053);
 /**
- * Fetches real translations for multiple strings in a single batch API call.
+ * Fetches translations for multiple strings in a single batch API call.
  * @param requests Array of translation requests.
  * @param sourceLanguageCode The source language code (e.g., "en").
+ * @param model The OpenAI model to use for translations.
  * @returns A promise that resolves to the batch translation response.
  */
-async function fetchBatchTranslations(requests, sourceLanguageCode = "en") {
-    core.info(`Fetching batch translations for ${requests.length} strings from ${sourceLanguageCode}.`);
-    const openaiService = new openaiService_1.OpenAIService();
+async function fetchBatchTranslations(requests, sourceLanguageCode = "en", model) {
+    core.info(`Fetching batch translations for ${requests.length} strings from ${sourceLanguageCode} using model ${model}.`);
+    const openaiService = new openaiService_1.OpenAIService(model);
     try {
         const batchResponse = await openaiService.getBatchTranslations(requests, sourceLanguageCode);
         return batchResponse;
@@ -35897,8 +35897,9 @@ var __importStar = (this && this.__importStar) || (function () {
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 const core = __importStar(__nccwpck_require__(7484));
 const fs = __importStar(__nccwpck_require__(9896));
+const exec = __importStar(__nccwpck_require__(5236));
 const localizationManager_1 = __nccwpck_require__(5711);
-const githubService_1 = __nccwpck_require__(2345); // Import functions from githubService
+const githubService_1 = __nccwpck_require__(2345);
 /**
  * Formats JSON to match Xcode's xcstrings formatting style with spaces before colons.
  * @param obj The object to stringify
@@ -35906,27 +35907,63 @@ const githubService_1 = __nccwpck_require__(2345); // Import functions from gith
  */
 function formatXcstringsJson(obj) {
     const jsonString = JSON.stringify(obj, null, 2);
-    // Replace all occurrences of "key": with "key" : (space before colon)
+    // Align with Xcode's xcstrings format style
     return jsonString.replace(/("(?:[^"\\]|\\.)*")\s*:/g, '$1 :');
 }
 async function run() {
     var _a, _b;
     try {
-        // Input gathering
+        const runXcodeBuild = core.getBooleanInput('run_xcode_build', { required: false });
+        const xcodeProjectPath = core.getInput('xcode_project_path', { required: runXcodeBuild });
+        const xcodeScheme = core.getInput('xcode_scheme', { required: runXcodeBuild });
+        const xcodeConfiguration = core.getInput('xcode_configuration', { required: false }) || 'Release';
+        const xcodeSdk = core.getInput('xcode_sdk', { required: false }) || 'iphonesimulator';
         const xcstringsFilePath = core.getInput('xcstrings_file_path', { required: false }) || 'Localizable.xcstrings';
         const targetLanguagesInput = core.getInput('target_languages', { required: true });
         const targetLanguages = targetLanguagesInput.split(',').map(lang => lang.trim()).filter(lang => lang);
+        const openaiModel = core.getInput('openai_model', { required: false }) || 'gpt-4o-mini';
         core.info(`XCStrings file: ${xcstringsFilePath}`);
         core.info(`Target languages: ${targetLanguages.join(', ')}`);
+        core.info(`OpenAI model: ${openaiModel}`);
+        if (runXcodeBuild) {
+            core.info('Running Xcode build to refresh xcstrings...');
+            if (!xcodeProjectPath) {
+                core.setFailed('Xcode project path is required when run_xcode_build is true.');
+                return;
+            }
+            if (!xcodeScheme) {
+                core.setFailed('Xcode scheme is required when run_xcode_build is true.');
+                return;
+            }
+            try {
+                const xcodebuildArgs = [
+                    '-project', xcodeProjectPath,
+                    '-scheme', xcodeScheme,
+                    '-configuration', xcodeConfiguration,
+                    '-sdk', xcodeSdk,
+                    'build',
+                    'CODE_SIGNING_ALLOWED=NO',
+                    'COMPILER_INDEX_STORE_ENABLE=NO'
+                ];
+                core.info(`Executing: xcodebuild ${xcodebuildArgs.join(' ')}`);
+                await exec.exec('xcodebuild', xcodebuildArgs);
+                core.info('Xcode build completed successfully.');
+            }
+            catch (e) {
+                core.setFailed(`Xcode build failed: ${e.message}`);
+                return;
+            }
+        }
+        else {
+            core.info('Skipping Xcode build step as run_xcode_build is set to false.');
+        }
         if (targetLanguages.length === 0) {
             core.setFailed('No target languages specified.');
             return;
         }
-        // SHA determination
         const { baseSha, headSha } = await (0, githubService_1.getShaRefs)();
         core.info(`Base SHA: ${baseSha}`);
         core.info(`Head SHA: ${headSha}`);
-        // File processing and translation
         const currentXcstringsFileContent = await (0, githubService_1.getFileContentAtCommit)(headSha, xcstringsFilePath);
         if (currentXcstringsFileContent === null) {
             core.setFailed(`Could not read ${xcstringsFilePath} at HEAD commit ${headSha}.`);
@@ -35941,14 +35978,20 @@ async function run() {
             return;
         }
         core.info(`Successfully parsed ${xcstringsFilePath} from HEAD. Found ${Object.keys(currentXcstringsData.strings).length} string keys.`);
-        // Collect all strings that need translation
         const translationRequests = [];
-        const translationChanges = { added: [], updated: [] };
+        const translationChanges = { added: [], updated: [], staleRemoved: [] };
         const stringTranslationMap = new Map();
+        let xcstringsModified = false;
         for (const key in currentXcstringsData.strings) {
             const currentStringEntry = currentXcstringsData.strings[key];
             if (!currentStringEntry.localizations) {
                 currentStringEntry.localizations = {};
+            }
+            if (currentStringEntry.extractionState === 'stale') {
+                delete currentStringEntry.extractionState;
+                xcstringsModified = true;
+                translationChanges.staleRemoved.push(key);
+                core.info(`Removed stale extraction state from: ${key}`);
             }
             const languagesNeeded = [];
             const isNewMap = new Map();
@@ -35960,7 +36003,6 @@ async function run() {
                     const isNewTranslation = !currentStringEntry.localizations[lang];
                     languagesNeeded.push(lang);
                     isNewMap.set(lang, isNewTranslation);
-                    // Initialize the structure if needed
                     if (!currentStringEntry.localizations[lang]) {
                         currentStringEntry.localizations[lang] = { stringUnit: { state: 'translated', value: '' } };
                     }
@@ -35969,18 +36011,15 @@ async function run() {
             if (languagesNeeded.length > 0) {
                 translationRequests.push({
                     key: key,
-                    text: key, // Using the key as the text to translate
+                    text: key,
                     targetLanguages: languagesNeeded
                 });
                 stringTranslationMap.set(key, { languages: languagesNeeded, isNew: isNewMap });
             }
         }
-        let xcstringsModified = false;
         if (translationRequests.length > 0) {
             core.info(`Found ${translationRequests.length} strings requiring translation. Processing in batch...`);
-            // Perform batch translation
-            const batchResponse = await (0, localizationManager_1.fetchBatchTranslations)(translationRequests, currentXcstringsData.sourceLanguage);
-            // Apply the translations to the xcstrings data
+            const batchResponse = await (0, localizationManager_1.fetchBatchTranslations)(translationRequests, currentXcstringsData.sourceLanguage, openaiModel);
             for (const translationResult of batchResponse.translations) {
                 const key = translationResult.key;
                 const stringEntry = currentXcstringsData.strings[key];
@@ -36013,7 +36052,10 @@ async function run() {
         if (translationChanges.updated.length > 0) {
             core.info(`Updated translations for ${translationChanges.updated.length} strings: ${translationChanges.updated.join(', ')}`);
         }
-        if (translationChanges.added.length === 0 && translationChanges.updated.length === 0) {
+        if (translationChanges.staleRemoved.length > 0) {
+            core.info(`Removed stale extraction state from ${translationChanges.staleRemoved.length} strings: ${translationChanges.staleRemoved.join(', ')}`);
+        }
+        if (translationChanges.added.length === 0 && translationChanges.updated.length === 0 && translationChanges.staleRemoved.length === 0) {
             core.info('No new strings requiring translation found in ' + xcstringsFilePath);
         }
         const changedFilesList = [];
@@ -36031,7 +36073,6 @@ async function run() {
         else {
             core.info(`No changes needed for ${xcstringsFilePath}`);
         }
-        // Git operations and PR creation
         if (changedFilesList.length > 0) {
             core.info(`Localization file ${xcstringsFilePath} was updated. Proceeding to create a PR.`);
             const token = core.getInput('github_token', { required: true });
@@ -36048,6 +36089,35 @@ async function run() {
         else {
             core.info('No localization files were changed. Skipping PR creation.');
         }
+        core.info('');
+        core.info('=== Action Summary ===');
+        core.info(`Files processed: ${xcstringsFilePath}`);
+        core.info(`Target languages: ${targetLanguages.join(', ')}`);
+        core.info(`OpenAI model used: ${openaiModel}`);
+        if (translationChanges.added.length > 0 || translationChanges.updated.length > 0 || translationChanges.staleRemoved.length > 0) {
+            core.info(`Translation changes:`);
+            if (translationChanges.added.length > 0) {
+                core.info(`  - Added: ${translationChanges.added.length} translations`);
+            }
+            if (translationChanges.updated.length > 0) {
+                core.info(`  - Updated: ${translationChanges.updated.length} translations`);
+            }
+            if (translationChanges.staleRemoved.length > 0) {
+                core.info(`  - Removed stale extraction state from: ${translationChanges.staleRemoved.length} strings`);
+            }
+        }
+        else {
+            core.info(`Translation changes: None`);
+        }
+        if (changedFilesList.length > 0) {
+            core.info(`Files modified: ${changedFilesList.join(', ')}`);
+            core.info(`Pull request: Created for localization updates`);
+        }
+        else {
+            core.info(`Files modified: None`);
+            core.info(`Pull request: Not created (no changes)`);
+        }
+        core.info('======================');
         core.info('Localization process completed.');
     }
     catch (error) {
@@ -36109,10 +36179,6 @@ Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.OpenAIService = void 0;
 const core = __importStar(__nccwpck_require__(7484));
 const openai_1 = __importDefault(__nccwpck_require__(2583));
-/**
- * Placeholder for OpenAI API key.
- * In a real scenario, this should be securely retrieved, e.g., from environment variables or action inputs.
- */
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY || "";
 let openai;
 if (OPENAI_API_KEY) {
@@ -36124,10 +36190,11 @@ else {
     core.warning('OpenAI API key is not set. Real translations will not be available.');
 }
 class OpenAIService {
-    constructor() {
+    constructor(model) {
         if (!openai) {
             throw new Error('OpenAI client is not initialized. Please ensure OPENAI_API_KEY environment variable is set with a valid API key.');
         }
+        this.model = model;
     }
     /**
      * Translates multiple strings to multiple target languages using OpenAI structured outputs in a single API call.
@@ -36189,7 +36256,7 @@ Return the translations in the exact JSON structure specified.`;
         const userPrompt = `Translate these strings:\n\n${stringsToTranslate}`;
         try {
             const chatCompletion = await openai.chat.completions.create({
-                model: 'gpt-4o-mini',
+                model: this.model,
                 messages: [
                     { role: 'system', content: systemPrompt },
                     { role: 'user', content: userPrompt }

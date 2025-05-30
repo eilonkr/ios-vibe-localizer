@@ -1,8 +1,9 @@
 import * as core from '@actions/core';
 import * as fs from 'fs';
+import * as exec from '@actions/exec';
 import { fetchBatchTranslations } from './localizationManager';
 import { XCStrings, TranslationRequest } from './types';
-import { createPullRequest, getShaRefs, getFileContentAtCommit, PrConfig } from './githubService'; // Import functions from githubService
+import { createPullRequest, getShaRefs, getFileContentAtCommit, PrConfig } from './githubService';
 
 /**
  * Formats JSON to match Xcode's xcstrings formatting style with spaces before colons.
@@ -17,6 +18,12 @@ function formatXcstringsJson(obj: any): string {
 
 async function run(): Promise<void> {
   try {
+    const runXcodeBuild = core.getBooleanInput('run_xcode_build', { required: false });
+    const xcodeProjectPath = core.getInput('xcode_project_path', { required: runXcodeBuild });
+    const xcodeScheme = core.getInput('xcode_scheme', { required: runXcodeBuild });
+    const xcodeConfiguration = core.getInput('xcode_configuration', { required: false }) || 'Release';
+    const xcodeSdk = core.getInput('xcode_sdk', { required: false }) || 'iphonesimulator';
+
     const xcstringsFilePath = core.getInput('xcstrings_file_path', { required: false }) || 'Localizable.xcstrings';
     const targetLanguagesInput = core.getInput('target_languages', { required: true });
     const targetLanguages = targetLanguagesInput.split(',').map(lang => lang.trim()).filter(lang => lang);
@@ -26,17 +33,46 @@ async function run(): Promise<void> {
     core.info(`Target languages: ${targetLanguages.join(', ')}`);
     core.info(`OpenAI model: ${openaiModel}`);
 
+    if (runXcodeBuild) {
+      core.info('Running Xcode build to refresh xcstrings...');
+      if (!xcodeProjectPath) {
+        core.setFailed('Xcode project path is required when run_xcode_build is true.');
+        return;
+      }
+      if (!xcodeScheme) {
+        core.setFailed('Xcode scheme is required when run_xcode_build is true.');
+        return;
+      }
+      try {
+        const xcodebuildArgs = [
+          '-project', xcodeProjectPath,
+          '-scheme', xcodeScheme,
+          '-configuration', xcodeConfiguration,
+          '-sdk', xcodeSdk,
+          'build',
+          'CODE_SIGNING_ALLOWED=NO',
+          'COMPILER_INDEX_STORE_ENABLE=NO'
+        ];
+        core.info(`Executing: xcodebuild ${xcodebuildArgs.join(' ')}`);
+        await exec.exec('xcodebuild', xcodebuildArgs);
+        core.info('Xcode build completed successfully.');
+      } catch (e: any) {
+        core.setFailed(`Xcode build failed: ${e.message}`);
+        return;
+      }
+    } else {
+      core.info('Skipping Xcode build step as run_xcode_build is set to false.');
+    }
+
     if (targetLanguages.length === 0) {
       core.setFailed('No target languages specified.');
       return;
     }
 
-    // SHA determination
     const { baseSha, headSha } = await getShaRefs();
     core.info(`Base SHA: ${baseSha}`);
     core.info(`Head SHA: ${headSha}`);
 
-    // File processing and translation
     const currentXcstringsFileContent = await getFileContentAtCommit(headSha, xcstringsFilePath);
     if (currentXcstringsFileContent === null) {
       core.setFailed(`Could not read ${xcstringsFilePath} at HEAD commit ${headSha}.`);
@@ -52,7 +88,6 @@ async function run(): Promise<void> {
     }
     core.info(`Successfully parsed ${xcstringsFilePath} from HEAD. Found ${Object.keys(currentXcstringsData.strings).length} string keys.`);
 
-    // Collect all strings that need translation
     const translationRequests: TranslationRequest[] = [];
     const translationChanges: { added: string[]; updated: string[]; staleRemoved: string[]; } = { added: [], updated: [], staleRemoved: [] };
     const stringTranslationMap: Map<string, { languages: string[], isNew: Map<string, boolean> }> = new Map();
@@ -64,7 +99,6 @@ async function run(): Promise<void> {
         currentStringEntry.localizations = {};
       }
 
-      // Check for and remove stale extraction state
       if (currentStringEntry.extractionState === 'stale') {
         delete currentStringEntry.extractionState;
         xcstringsModified = true;
@@ -86,7 +120,6 @@ async function run(): Promise<void> {
           languagesNeeded.push(lang);
           isNewMap.set(lang, isNewTranslation);
           
-          // Initialize the structure if needed
           if (!currentStringEntry.localizations[lang]) {
             currentStringEntry.localizations[lang] = { stringUnit: { state: 'translated', value: '' } };
           }
@@ -96,7 +129,7 @@ async function run(): Promise<void> {
       if (languagesNeeded.length > 0) {
         translationRequests.push({
           key: key,
-          text: key, // Using the key as the text to translate
+          text: key,
           targetLanguages: languagesNeeded
         });
         stringTranslationMap.set(key, { languages: languagesNeeded, isNew: isNewMap });
@@ -105,11 +138,9 @@ async function run(): Promise<void> {
 
     if (translationRequests.length > 0) {
       core.info(`Found ${translationRequests.length} strings requiring translation. Processing in batch...`);
-      
-      // Perform batch translation
+
       const batchResponse = await fetchBatchTranslations(translationRequests, currentXcstringsData.sourceLanguage, openaiModel);
-      
-      // Apply the translations to the xcstrings data
+
       for (const translationResult of batchResponse.translations) {
         const key = translationResult.key;
         const stringEntry = currentXcstringsData.strings[key];

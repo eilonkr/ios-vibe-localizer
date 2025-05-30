@@ -19,7 +19,6 @@ export async function createPullRequest(
 ): Promise<void> {
   const context = github.context;
 
-  // Configure git
   await exec.exec('git', ['config', '--global', 'user.name', prConfig.commitUserName]);
   await exec.exec('git', ['config', '--global', 'user.email', prConfig.commitUserEmail]);
 

@@ -2,10 +2,6 @@ import * as core from '@actions/core';
 import OpenAI from 'openai';
 import { TranslationRequest, BatchTranslationResponse } from './types';
 
-/**
- * Placeholder for OpenAI API key.
- * In a real scenario, this should be securely retrieved, e.g., from environment variables or action inputs.
- */
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY || "";
 
 let openai: OpenAI | undefined;
