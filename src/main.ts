@@ -62,10 +62,11 @@ async function run(): Promise<void> {
       }
 
       if (currentStringEntry.extractionState === 'stale') {
-        delete currentStringEntry.extractionState;
+        delete currentXcstringsData.strings[key];
         xcstringsModified = true;
         translationChanges.staleRemoved.push(key);
-        core.info(`Removed stale extraction state from: ${key}`);
+        core.info(`Removed stale string entry: ${key}`);
+        continue;
       }
 
       const languagesNeeded: string[] = [];
