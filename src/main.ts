@@ -162,7 +162,9 @@ async function run(): Promise<void> {
     }
 
     if (changedFilesList.length > 0) {
-      core.info(`Localization file ${xcstringsFilePath} was updated. Proceeding to create a PR.`);
+      const totalChanges = translationChanges.added.length + translationChanges.updated.length + translationChanges.staleRemoved.length;
+      const changedKeys = [...translationChanges.added, ...translationChanges.updated, ...translationChanges.staleRemoved];
+      core.info(`Localization file ${xcstringsFilePath} was updated with ${totalChanges} changes. String keys: [${changedKeys.join(', ')}]. Added: ${translationChanges.added.length}, Updated: ${translationChanges.updated.length}, Stale removed: ${translationChanges.staleRemoved.length}. Proceeding to create a PR.`);
 
       const token = core.getInput('github_token', { required: true });
       const prConfig: PrConfig = {
