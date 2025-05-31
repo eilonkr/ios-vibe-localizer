@@ -69,6 +69,11 @@ async function run(): Promise<void> {
         continue;
       }
 
+      if (currentStringEntry.shouldTranslate === false) {
+        core.info(`Skipping translation for string with shouldTranslate=false: ${key}`);
+        continue;
+      }
+
       const languagesNeeded: string[] = [];
       const isNewMap: Map<string, boolean> = new Map();
 

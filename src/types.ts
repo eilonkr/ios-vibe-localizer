@@ -4,6 +4,7 @@ export interface XCStrings {
     [key: string]: {
       comment?: string;
       extractionState?: string;
+      shouldTranslate?: boolean;
       localizations?: {
         [lang: string]: {
           stringUnit: {
