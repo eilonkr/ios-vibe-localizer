@@ -35956,6 +35956,10 @@ async function run() {
                 core.info(`Removed stale string entry: ${key}`);
                 continue;
             }
+            if (currentStringEntry.shouldTranslate === false) {
+                core.info(`Skipping translation for string with shouldTranslate=false: ${key}`);
+                continue;
+            }
             const languagesNeeded = [];
             const isNewMap = new Map();
             for (const lang of targetLanguages) {
