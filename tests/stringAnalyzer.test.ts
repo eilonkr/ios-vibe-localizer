@@ -1,4 +1,4 @@
-import { analyzeStringsForTranslation } from '../src/stringAnalyzer';
+import { analyzeStringsForTranslation } from '../src/helpers/stringAnalyzer';
 import { XCStrings } from '../src/types';
 
 describe('analyzeStringsForTranslation', () => {
