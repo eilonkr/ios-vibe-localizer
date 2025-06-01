@@ -55,7 +55,7 @@ async function run(): Promise<void> {
     const analysisResult = analyzeStringsForTranslation(currentXcstringsData, targetLanguages);
     const { 
       translationRequests, 
-      translationChanges, 
+      translationChanges,
       stringTranslationMap, 
       modifiedXcstringsData: updatedXcstringsData, 
       xcstringsModified 
@@ -141,7 +141,7 @@ async function run(): Promise<void> {
         prBody: core.getInput('pr_body', { required: false }) || 'Automated PR with new translations.'
       };
       
-      await createPullRequest(xcstringsFilePath, changedFilesList, token, prConfig);
+      await createPullRequest(xcstringsFilePath, changedFilesList, token, prConfig, translationChanges, targetLanguages);
 
     } else {
       core.info('No localization files were changed. Skipping PR creation.');

@@ -35676,7 +35676,8 @@ exports.getFileContentAtCommit = getFileContentAtCommit;
 const core = __importStar(__nccwpck_require__(7484));
 const github = __importStar(__nccwpck_require__(3228));
 const exec = __importStar(__nccwpck_require__(5236));
-async function createPullRequest(xcstringsFilePath, changedFilesList, token, prConfig) {
+const prDescriptionGenerator_1 = __nccwpck_require__(898);
+async function createPullRequest(xcstringsFilePath, changedFilesList, token, prConfig, translationChanges, targetLanguages) {
     var _a;
     const context = github.context;
     await exec.exec('git', ['config', '--global', 'user.name', prConfig.commitUserName]);
@@ -35702,10 +35703,7 @@ async function createPullRequest(xcstringsFilePath, changedFilesList, token, prC
         }
     }
     core.info(`Base branch for PR will be: ${baseBranchForPR}`);
-    let finalPrBody = prConfig.prBody;
-    if (changedFilesList.length > 0) {
-        finalPrBody += `\n\nUpdated files:\n- ${changedFilesList.join('\n- ')}`;
-    }
+    const finalPrBody = (0, prDescriptionGenerator_1.generatePrDescription)(prConfig.prBody, translationChanges, targetLanguages, changedFilesList);
     core.info(`Creating pull request: ${prConfig.prTitle}`);
     try {
         const response = await octokit.rest.pulls.create({
@@ -35899,6 +35897,7 @@ const core = __importStar(__nccwpck_require__(7484));
 const fs = __importStar(__nccwpck_require__(9896));
 const localizationManager_1 = __nccwpck_require__(5711);
 const githubService_1 = __nccwpck_require__(2345);
+const stringAnalyzer_1 = __nccwpck_require__(6172);
 /**
  * Formats JSON to match Xcode's xcstrings formatting style with spaces before colons.
  * @param obj The object to stringify
@@ -35910,7 +35909,6 @@ function formatXcstringsJson(obj) {
     return jsonString.replace(/("(?:[^"\\]|\\.)*")\s*:/g, '$1 :');
 }
 async function run() {
-    var _a, _b;
     try {
         const xcstringsFilePath = core.getInput('xcstrings_file_path', { required: false }) || 'Localizable.xcstrings';
         const targetLanguagesInput = core.getInput('target_languages', { required: true });
@@ -35940,56 +35938,18 @@ async function run() {
             return;
         }
         core.info(`Successfully parsed ${xcstringsFilePath} from HEAD. Found ${Object.keys(currentXcstringsData.strings).length} string keys.`);
-        const translationRequests = [];
-        const translationChanges = { added: [], updated: [], staleRemoved: [] };
-        const stringTranslationMap = new Map();
-        let xcstringsModified = false;
-        for (const key in currentXcstringsData.strings) {
-            const currentStringEntry = currentXcstringsData.strings[key];
-            if (!currentStringEntry.localizations) {
-                currentStringEntry.localizations = {};
-            }
-            if (currentStringEntry.extractionState === 'stale') {
-                delete currentXcstringsData.strings[key];
-                xcstringsModified = true;
-                translationChanges.staleRemoved.push(key);
-                core.info(`Removed stale string entry: ${key}`);
-                continue;
-            }
-            if (currentStringEntry.shouldTranslate === false) {
-                core.info(`Skipping translation for string with shouldTranslate=false: ${key}`);
-                continue;
-            }
-            const languagesNeeded = [];
-            const isNewMap = new Map();
-            for (const lang of targetLanguages) {
-                const needsTranslationForLang = !currentStringEntry.localizations[lang] ||
-                    !((_a = currentStringEntry.localizations[lang]) === null || _a === void 0 ? void 0 : _a.stringUnit) ||
-                    !((_b = currentStringEntry.localizations[lang]) === null || _b === void 0 ? void 0 : _b.stringUnit.value);
-                if (needsTranslationForLang) {
-                    const isNewTranslation = !currentStringEntry.localizations[lang];
-                    languagesNeeded.push(lang);
-                    isNewMap.set(lang, isNewTranslation);
-                    if (!currentStringEntry.localizations[lang]) {
-                        currentStringEntry.localizations[lang] = { stringUnit: { state: 'translated', value: '' } };
-                    }
-                }
-            }
-            if (languagesNeeded.length > 0) {
-                translationRequests.push({
-                    key: key,
-                    text: key,
-                    targetLanguages: languagesNeeded
-                });
-                stringTranslationMap.set(key, { languages: languagesNeeded, isNew: isNewMap });
-            }
+        // Analyze strings to determine what needs translation
+        const analysisResult = (0, stringAnalyzer_1.analyzeStringsForTranslation)(currentXcstringsData, targetLanguages);
+        const { translationRequests, translationChanges, stringTranslationMap, modifiedXcstringsData: updatedXcstringsData, xcstringsModified } = analysisResult;
+        for (const key of translationChanges.staleRemoved) {
+            core.info(`Removed stale string entry: ${key}`);
         }
         if (translationRequests.length > 0) {
             core.info(`Found ${translationRequests.length} strings requiring translation. Processing in batch...`);
-            const batchResponse = await (0, localizationManager_1.fetchBatchTranslations)(translationRequests, currentXcstringsData.sourceLanguage, openaiModel);
+            const batchResponse = await (0, localizationManager_1.fetchBatchTranslations)(translationRequests, updatedXcstringsData.sourceLanguage, openaiModel);
             for (const translationResult of batchResponse.translations) {
                 const key = translationResult.key;
-                const stringEntry = currentXcstringsData.strings[key];
+                const stringEntry = updatedXcstringsData.strings[key];
                 const translationInfo = stringTranslationMap.get(key);
                 if (!stringEntry || !translationInfo) {
                     core.warning(`Received translation for unknown key: ${key}`);
@@ -36001,7 +35961,6 @@ async function run() {
                             state: "translated",
                             value: translatedValue
                         };
-                        xcstringsModified = true;
                         const changeKey = `${key} (${lang})`;
                         if (translationInfo.isNew.get(lang)) {
                             translationChanges.added.push(changeKey);
@@ -36026,9 +35985,9 @@ async function run() {
             core.info('No new strings requiring translation found in ' + xcstringsFilePath);
         }
         const changedFilesList = [];
-        if (xcstringsModified) {
+        if (xcstringsModified || translationChanges.added.length > 0 || translationChanges.updated.length > 0) {
             try {
-                fs.writeFileSync(xcstringsFilePath, formatXcstringsJson(currentXcstringsData));
+                fs.writeFileSync(xcstringsFilePath, formatXcstringsJson(updatedXcstringsData));
                 core.info(`Changes written to ${xcstringsFilePath}`);
                 changedFilesList.push(xcstringsFilePath);
             }
@@ -36053,7 +36012,7 @@ async function run() {
                 prTitle: core.getInput('pr_title', { required: false }) || 'New Translations Added',
                 prBody: core.getInput('pr_body', { required: false }) || 'Automated PR with new translations.'
             };
-            await (0, githubService_1.createPullRequest)(xcstringsFilePath, changedFilesList, token, prConfig);
+            await (0, githubService_1.createPullRequest)(xcstringsFilePath, changedFilesList, token, prConfig, translationChanges, targetLanguages);
         }
         else {
             core.info('No localization files were changed. Skipping PR creation.');
@@ -36254,6 +36213,147 @@ Return the translations in the exact JSON structure specified.`;
     }
 }
 exports.OpenAIService = OpenAIService;
+
+
+/***/ }),
+
+/***/ 898:
+/***/ ((__unused_webpack_module, exports) => {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.generatePrDescription = generatePrDescription;
+/**
+ * Generates a detailed PR description that includes a summary of all translation changes.
+ * @param basePrBody The base PR body text from configuration
+ * @param translationChanges Object containing arrays of added, updated, and removed translations
+ * @param targetLanguages Array of target language codes
+ * @param changedFilesList Array of files that were modified
+ * @returns Complete PR description with detailed change summary
+ */
+function generatePrDescription(basePrBody, translationChanges, targetLanguages, changedFilesList) {
+    let finalPrBody = basePrBody;
+    // Add detailed translation changes summary
+    if (translationChanges && targetLanguages) {
+        const totalChanges = translationChanges.added.length + translationChanges.updated.length + translationChanges.staleRemoved.length;
+        if (totalChanges > 0) {
+            finalPrBody += '\n\n## Translation Changes Summary\n\n';
+            finalPrBody += `**Target Languages:** ${targetLanguages.join(', ')}\n`;
+            finalPrBody += `**Total Changes:** ${totalChanges}\n\n`;
+            if (translationChanges.added.length > 0) {
+                finalPrBody += `### ✅ Added Translations (${translationChanges.added.length})\n`;
+                for (const change of translationChanges.added) {
+                    finalPrBody += `- ${change}\n`;
+                }
+                finalPrBody += '\n';
+            }
+            if (translationChanges.updated.length > 0) {
+                finalPrBody += `### 🔄 Updated Translations (${translationChanges.updated.length})\n`;
+                for (const change of translationChanges.updated) {
+                    finalPrBody += `- ${change}\n`;
+                }
+                finalPrBody += '\n';
+            }
+            if (translationChanges.staleRemoved.length > 0) {
+                finalPrBody += `### 🗑️ Removed Stale Strings (${translationChanges.staleRemoved.length})\n`;
+                for (const change of translationChanges.staleRemoved) {
+                    finalPrBody += `- ${change}\n`;
+                }
+                finalPrBody += '\n';
+            }
+        }
+    }
+    if (changedFilesList && changedFilesList.length > 0) {
+        finalPrBody += `\n**Updated files:**\n- ${changedFilesList.join('\n- ')}`;
+    }
+    return finalPrBody;
+}
+
+
+/***/ }),
+
+/***/ 6172:
+/***/ ((__unused_webpack_module, exports) => {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.analyzeStringsForTranslation = analyzeStringsForTranslation;
+/**
+ * Analyzes XCStrings data to identify strings that need translation and prepares translation requests.
+ * This is the core business logic that determines what translations are needed.
+ *
+ * @param xcstringsData The parsed XCStrings data
+ * @param targetLanguages Array of target language codes to translate to
+ * @returns Analysis result containing translation requests and change tracking
+ */
+function analyzeStringsForTranslation(xcstringsData, targetLanguages) {
+    var _a, _b;
+    // Create a deep copy to avoid modifying the original
+    const modifiedXcstringsData = JSON.parse(JSON.stringify(xcstringsData));
+    const translationRequests = [];
+    const translationChanges = {
+        added: [],
+        updated: [],
+        staleRemoved: []
+    };
+    const stringTranslationMap = new Map();
+    let xcstringsModified = false;
+    for (const key in modifiedXcstringsData.strings) {
+        const currentStringEntry = modifiedXcstringsData.strings[key];
+        // Initialize localizations if not present
+        if (!currentStringEntry.localizations) {
+            currentStringEntry.localizations = {};
+        }
+        // Remove stale entries
+        if (currentStringEntry.extractionState === 'stale') {
+            delete modifiedXcstringsData.strings[key];
+            xcstringsModified = true;
+            translationChanges.staleRemoved.push(key);
+            continue;
+        }
+        // Skip strings marked as shouldTranslate=false
+        if (currentStringEntry.shouldTranslate === false) {
+            continue;
+        }
+        const languagesNeeded = [];
+        const isNewMap = new Map();
+        // Check each target language to see if translation is needed
+        for (const lang of targetLanguages) {
+            const needsTranslationForLang = !currentStringEntry.localizations[lang] ||
+                !((_a = currentStringEntry.localizations[lang]) === null || _a === void 0 ? void 0 : _a.stringUnit) ||
+                !((_b = currentStringEntry.localizations[lang]) === null || _b === void 0 ? void 0 : _b.stringUnit.value);
+            if (needsTranslationForLang) {
+                const isNewTranslation = !currentStringEntry.localizations[lang];
+                languagesNeeded.push(lang);
+                isNewMap.set(lang, isNewTranslation);
+                // Initialize the localization structure if it doesn't exist
+                if (!currentStringEntry.localizations[lang]) {
+                    currentStringEntry.localizations[lang] = {
+                        stringUnit: { state: 'translated', value: '' }
+                    };
+                }
+            }
+        }
+        // If any languages need translation, add to requests
+        if (languagesNeeded.length > 0) {
+            translationRequests.push({
+                key: key,
+                text: key,
+                targetLanguages: languagesNeeded
+            });
+            stringTranslationMap.set(key, { languages: languagesNeeded, isNew: isNewMap });
+        }
+    }
+    return {
+        translationRequests,
+        translationChanges,
+        stringTranslationMap,
+        modifiedXcstringsData,
+        xcstringsModified
+    };
+}
 
 
 /***/ }),

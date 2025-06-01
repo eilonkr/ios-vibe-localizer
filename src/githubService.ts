@@ -1,6 +1,7 @@
 import * as core from '@actions/core';
 import * as github from '@actions/github';
 import * as exec from '@actions/exec';
+import { generatePrDescription, TranslationChanges } from './prDescriptionGenerator';
 
 export interface PrConfig {
   branchPrefix: string;
@@ -15,7 +16,9 @@ export async function createPullRequest(
   xcstringsFilePath: string,
   changedFilesList: string[],
   token: string,
-  prConfig: PrConfig
+  prConfig: PrConfig,
+  translationChanges?: TranslationChanges,
+  targetLanguages?: string[]
 ): Promise<void> {
   const context = github.context;
 
@@ -49,11 +52,12 @@ export async function createPullRequest(
   }
   core.info(`Base branch for PR will be: ${baseBranchForPR}`);
 
-  let finalPrBody = prConfig.prBody;
-  if (changedFilesList.length > 0) {
-    finalPrBody += `\n\nUpdated files:\n- ${changedFilesList.join('\n- ')}`;
-  }
-  
+  const finalPrBody = generatePrDescription(
+    prConfig.prBody,
+    translationChanges,
+    targetLanguages,
+    changedFilesList
+  );
 
   core.info(`Creating pull request: ${prConfig.prTitle}`);
   try {
