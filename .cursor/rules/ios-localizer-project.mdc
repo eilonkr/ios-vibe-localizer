@@ -1,0 +1,121 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+# iOS Localizer Project Guide
+
+## Project Overview
+
+iOS Localizer is a GitHub Action that automates the translation of iOS app strings using OpenAI's GPT models. It processes `.xcstrings` files, identifies missing translations, generates translations via OpenAI, and creates pull requests with the updates.
+
+## Core Architecture
+
+### Main Entry Point
+The application starts in [main.ts](mdc:src/main.ts), which orchestrates the entire localization workflow:
+
+1. **Input Processing** - Reads GitHub Action inputs (xcstrings file path, target languages, OpenAI model)
+2. **Git Analysis** - Determines base and head SHA refs for change detection
+3. **File Processing** - Parses the current `.xcstrings` file from HEAD commit
+4. **Translation Detection** - Identifies strings needing translation across target languages
+5. **Batch Translation** - Calls OpenAI service for bulk translations
+6. **File Updates** - Applies translations and writes updated `.xcstrings` file
+7. **PR Creation** - Creates GitHub pull request with changes
+
+### Key Components
+
+#### Type Definitions ([types.ts](mdc:src/types.ts))
+- `XCStrings`: Main interface for `.xcstrings` file structure
+- `TranslationRequest`: Request format for translation batches
+- `TranslationResult`: Response format from translation service
+- `BatchTranslationResponse`: Wrapper for batch translation results
+
+#### Translation Management ([localizationManager.ts](mdc:src/localizationManager.ts))
+- `fetchBatchTranslations()`: Orchestrates batch translation requests
+- Acts as a bridge between main logic and OpenAI service
+
+#### OpenAI Integration ([openaiService.ts](mdc:src/openaiService.ts))
+- `OpenAIService` class: Handles OpenAI API communication
+- `getBatchTranslations()`: Uses structured outputs for consistent translation format
+- Supports multiple target languages in single API call
+- Preserves placeholders and formatting in translations
+
+#### GitHub Integration ([githubService.ts](mdc:src/githubService.ts))
+- `createPullRequest()`: Creates branches, commits changes, and opens PRs
+- `getShaRefs()`: Determines base/head commits for different GitHub events
+- `getFileContentAtCommit()`: Retrieves file content at specific commits
+- Handles both push and pull_request events
+
+## Key Workflow Logic
+
+### Translation Detection Algorithm
+1. Iterates through all strings in `.xcstrings` file
+2. Removes stale entries (marked with `extractionState: 'stale'`)
+3. Skips strings with `shouldTranslate: false`
+4. Identifies missing translations per target language
+5. Builds batch translation requests
+
+### File Format Handling
+- Uses `formatXcstringsJson()` to match Xcode's formatting style
+- Preserves Xcode-specific formatting with spaces before colons
+- Maintains compatibility with Xcode's `.xcstrings` structure
+
+### Change Tracking
+- Tracks three types of changes: added, updated, stale removed
+- Provides detailed logging for each change type
+- Only creates PRs when actual changes are made
+
+## Configuration
+
+### GitHub Action Inputs ([action.yml](mdc:action.yml))
+- **Required**: `target_languages`, `github_token`
+- **Optional**: File paths, PR configuration, commit settings, OpenAI model
+- **Environment**: `OPENAI_API_KEY` required for translations
+
+### Build Configuration ([package.json](mdc:package.json))
+- Uses `@vercel/ncc` to bundle TypeScript into single `dist/index.js`
+- Dependencies: GitHub Actions toolkit, OpenAI SDK
+- Build command: `npm run build`
+
+## Development Guidelines
+
+### Code Organization
+- Keep main workflow logic in [main.ts](mdc:src/main.ts)
+- Service classes handle external integrations (OpenAI, GitHub)
+- Type definitions centralized in [types.ts](mdc:src/types.ts)
+- Manager classes orchestrate between services
+
+### Error Handling
+- Use `core.setFailed()` for fatal errors that should stop the action
+- Use `core.warning()` for non-fatal issues
+- Provide detailed error messages with context
+- Handle API failures gracefully
+
+### Logging Strategy
+- Use `core.info()` for progress updates
+- Provide detailed summaries at the end
+- Log change statistics and file modifications
+- Include SHA references for debugging
+
+### Testing Considerations
+- Test with different GitHub event types (push, pull_request)
+- Verify handling of missing files and malformed JSON
+- Test batch translation with various language combinations
+- Validate PR creation with different branch configurations
+
+## Extension Points
+
+### Adding New LLM Providers
+- Create new service class similar to `OpenAIService`
+- Implement `getBatchTranslations()` interface
+- Update [localizationManager.ts](mdc:src/localizationManager.ts) to support provider selection
+
+### Supporting Multiple Files
+- Extend input processing to handle file patterns
+- Modify main loop to process multiple `.xcstrings` files
+- Update PR creation to handle multiple file changes
+
+### Enhanced Translation Features
+- Add translation memory support in `OpenAIService`
+- Implement custom terminology management
+- Add support for pluralization rules and complex formats
