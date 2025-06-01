@@ -1,5 +1,5 @@
-name: 'iOS Localizer Test Action'
-description: 'Prints a test message.'
+name: 'iOS Localizer'
+description: 'iOS Localizer is a GitHub Action that automates the translation of iOS app strings using OpenAI's GPT models.'
 author: 'iOS Localizer'
 
 inputs:
@@ -43,9 +43,9 @@ inputs:
     default: 'gpt-4o-mini'
 
 runs:
-  using: 'node16' # Or node20 if you prefer
+  using: 'node16'
   main: 'dist/index.js'
 
-branding: # Optional, for the GitHub Marketplace
+branding:
   icon: 'globe'
   color: 'blue' 
