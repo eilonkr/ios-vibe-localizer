@@ -3,6 +3,7 @@ import * as fs from 'fs';
 import { fetchBatchTranslations } from './localizationManager';
 import { XCStrings, TranslationRequest } from './types';
 import { createPullRequest, getShaRefs, getFileContentAtCommit, PrConfig } from './githubService';
+import { analyzeStringsForTranslation } from './stringAnalyzer';
 
 /**
  * Formats JSON to match Xcode's xcstrings formatting style with spaces before colons.
@@ -50,68 +51,28 @@ async function run(): Promise<void> {
     }
     core.info(`Successfully parsed ${xcstringsFilePath} from HEAD. Found ${Object.keys(currentXcstringsData.strings).length} string keys.`);
 
-    const translationRequests: TranslationRequest[] = [];
-    const translationChanges: { added: string[]; updated: string[]; staleRemoved: string[]; } = { added: [], updated: [], staleRemoved: [] };
-    const stringTranslationMap: Map<string, { languages: string[], isNew: Map<string, boolean> }> = new Map();
-    let xcstringsModified = false;
+    // Analyze strings to determine what needs translation
+    const analysisResult = analyzeStringsForTranslation(currentXcstringsData, targetLanguages);
+    const { 
+      translationRequests, 
+      translationChanges, 
+      stringTranslationMap, 
+      modifiedXcstringsData: updatedXcstringsData, 
+      xcstringsModified 
+    } = analysisResult;
 
-    for (const key in currentXcstringsData.strings) {
-      const currentStringEntry = currentXcstringsData.strings[key];
-      if (!currentStringEntry.localizations) {
-        currentStringEntry.localizations = {};
-      }
-
-      if (currentStringEntry.extractionState === 'stale') {
-        delete currentXcstringsData.strings[key];
-        xcstringsModified = true;
-        translationChanges.staleRemoved.push(key);
-        core.info(`Removed stale string entry: ${key}`);
-        continue;
-      }
-
-      if (currentStringEntry.shouldTranslate === false) {
-        core.info(`Skipping translation for string with shouldTranslate=false: ${key}`);
-        continue;
-      }
-
-      const languagesNeeded: string[] = [];
-      const isNewMap: Map<string, boolean> = new Map();
-
-      for (const lang of targetLanguages) {
-        const needsTranslationForLang = 
-          !currentStringEntry.localizations[lang] || 
-          !currentStringEntry.localizations[lang]?.stringUnit ||
-          !currentStringEntry.localizations[lang]?.stringUnit.value;
-
-        if (needsTranslationForLang) {
-          const isNewTranslation = !currentStringEntry.localizations[lang];
-          languagesNeeded.push(lang);
-          isNewMap.set(lang, isNewTranslation);
-          
-          if (!currentStringEntry.localizations[lang]) {
-            currentStringEntry.localizations[lang] = { stringUnit: { state: 'translated', value: '' } };
-          }
-        }
-      }
-
-      if (languagesNeeded.length > 0) {
-        translationRequests.push({
-          key: key,
-          text: key,
-          targetLanguages: languagesNeeded
-        });
-        stringTranslationMap.set(key, { languages: languagesNeeded, isNew: isNewMap });
-      }
+    for (const key of translationChanges.staleRemoved) {
+      core.info(`Removed stale string entry: ${key}`);
     }
 
     if (translationRequests.length > 0) {
       core.info(`Found ${translationRequests.length} strings requiring translation. Processing in batch...`);
 
-      const batchResponse = await fetchBatchTranslations(translationRequests, currentXcstringsData.sourceLanguage, openaiModel);
+      const batchResponse = await fetchBatchTranslations(translationRequests, updatedXcstringsData.sourceLanguage, openaiModel);
 
       for (const translationResult of batchResponse.translations) {
         const key = translationResult.key;
-        const stringEntry = currentXcstringsData.strings[key];
+        const stringEntry = updatedXcstringsData.strings[key];
         const translationInfo = stringTranslationMap.get(key);
         
         if (!stringEntry || !translationInfo) {
@@ -125,7 +86,6 @@ async function run(): Promise<void> {
               state: "translated",
               value: translatedValue
             };
-            xcstringsModified = true;
             
             const changeKey = `${key} (${lang})`;
             if (translationInfo.isNew.get(lang)) {
@@ -153,9 +113,9 @@ async function run(): Promise<void> {
     
     const changedFilesList: string[] = [];
 
-    if (xcstringsModified) {
+    if (xcstringsModified || translationChanges.added.length > 0 || translationChanges.updated.length > 0) {
       try {
-        fs.writeFileSync(xcstringsFilePath, formatXcstringsJson(currentXcstringsData));
+        fs.writeFileSync(xcstringsFilePath, formatXcstringsJson(updatedXcstringsData));
         core.info(`Changes written to ${xcstringsFilePath}`);
         changedFilesList.push(xcstringsFilePath);
       } catch (e:any) {
