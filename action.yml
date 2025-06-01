@@ -1,5 +1,6 @@
 name: 'iOS Localizer'
-description: 'iOS Localizer is a GitHub Action that automates the translation of iOS app strings using OpenAI's GPT models.'
+description: >
+  iOS Localizer is a GitHub Action that automates the translation of iOS app strings using OpenAI's GPT models.
 author: 'iOS Localizer'
 
 inputs:
@@ -43,7 +44,7 @@ inputs:
     default: 'gpt-4o-mini'
 
 runs:
-  using: 'node16'
+  using: 'node20'
   main: 'dist/index.js'
 
 branding:
