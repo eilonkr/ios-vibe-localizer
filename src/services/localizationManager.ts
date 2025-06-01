@@ -1,6 +1,6 @@
 import * as core from '@actions/core';
 import { OpenAIService } from './openaiService';
-import { TranslationRequest, BatchTranslationResponse } from './types';
+import { TranslationRequest, BatchTranslationResponse } from '../types';
 
 /**
  * Fetches translations for multiple strings in a single batch API call.

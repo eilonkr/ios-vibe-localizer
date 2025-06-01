@@ -35631,224 +35631,142 @@ function wrappy (fn, cb) {
 
 /***/ }),
 
-/***/ 2345:
-/***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
+/***/ 8076:
+/***/ ((__unused_webpack_module, exports) => {
 
 "use strict";
 
-var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    var desc = Object.getOwnPropertyDescriptor(m, k);
-    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
-      desc = { enumerable: true, get: function() { return m[k]; } };
-    }
-    Object.defineProperty(o, k2, desc);
-}) : (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    o[k2] = m[k];
-}));
-var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
-    Object.defineProperty(o, "default", { enumerable: true, value: v });
-}) : function(o, v) {
-    o["default"] = v;
-});
-var __importStar = (this && this.__importStar) || (function () {
-    var ownKeys = function(o) {
-        ownKeys = Object.getOwnPropertyNames || function (o) {
-            var ar = [];
-            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
-            return ar;
-        };
-        return ownKeys(o);
-    };
-    return function (mod) {
-        if (mod && mod.__esModule) return mod;
-        var result = {};
-        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
-        __setModuleDefault(result, mod);
-        return result;
-    };
-})();
 Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.createPullRequest = createPullRequest;
-exports.getShaRefs = getShaRefs;
-exports.getFileContentAtCommit = getFileContentAtCommit;
-const core = __importStar(__nccwpck_require__(7484));
-const github = __importStar(__nccwpck_require__(3228));
-const exec = __importStar(__nccwpck_require__(5236));
-const prDescriptionGenerator_1 = __nccwpck_require__(898);
-async function createPullRequest(xcstringsFilePath, changedFilesList, token, prConfig, translationChanges, targetLanguages) {
-    var _a;
-    const context = github.context;
-    await exec.exec('git', ['config', '--global', 'user.name', prConfig.commitUserName]);
-    await exec.exec('git', ['config', '--global', 'user.email', prConfig.commitUserEmail]);
-    const newBranchName = `${prConfig.branchPrefix}${context.eventName}-${context.runId}-${Date.now()}`.replace(/\//g, '-');
-    core.info(`Creating new branch: ${newBranchName}`);
-    await exec.exec('git', ['checkout', '-b', newBranchName]);
-    core.info('Adding file to commit...');
-    await exec.exec('git', ['add', xcstringsFilePath]);
-    core.info('Committing changes...');
-    await exec.exec('git', ['commit', '-m', prConfig.commitMessage]);
-    core.info('Pushing new branch...');
-    await exec.exec('git', ['push', '-u', 'origin', newBranchName]);
-    const octokit = github.getOctokit(token);
-    const repoOwner = context.repo.owner;
-    const repoName = context.repo.repo;
-    let baseBranchForPR = context.ref.replace('refs/heads/', '');
-    if (context.eventName === 'pull_request') {
-        baseBranchForPR = (_a = context.payload.pull_request) === null || _a === void 0 ? void 0 : _a.base.ref;
-        if (!baseBranchForPR) {
-            core.setFailed('Could not determine base branch from pull request context for PR creation.');
-            return;
-        }
-    }
-    core.info(`Base branch for PR will be: ${baseBranchForPR}`);
-    const finalPrBody = (0, prDescriptionGenerator_1.generatePrDescription)(prConfig.prBody, translationChanges, targetLanguages, changedFilesList);
-    core.info(`Creating pull request: ${prConfig.prTitle}`);
-    try {
-        const response = await octokit.rest.pulls.create({
-            owner: repoOwner,
-            repo: repoName,
-            title: prConfig.prTitle,
-            head: newBranchName,
-            base: baseBranchForPR,
-            body: finalPrBody,
-            draft: false
-        });
-        core.info(`Pull request created: ${response.data.html_url}`);
-    }
-    catch (e) {
-        core.error('Error creating pull request:');
-        if (e.response) {
-            core.error(`Status: ${e.response.status}`);
-            core.error(`Data: ${JSON.stringify(e.response.data)}`);
-        }
-        core.setFailed(e.message);
-    }
-}
-async function getShaRefs() {
-    var _a, _b, _c, _d;
-    const context = github.context;
-    let baseSha = '';
-    let headSha = '';
-    switch (context.eventName) {
-        case 'pull_request':
-            baseSha = (_a = context.payload.pull_request) === null || _a === void 0 ? void 0 : _a.base.sha;
-            headSha = (_b = context.payload.pull_request) === null || _b === void 0 ? void 0 : _b.head.sha;
-            break;
-        case 'push':
-            baseSha = context.payload.before;
-            headSha = context.payload.after;
-            if (/^0+$/.test(baseSha)) {
-                core.info('New branch push detected. Comparing against parent of HEAD.');
-                const firstCommitSha = (_d = (_c = context.payload.commits) === null || _c === void 0 ? void 0 : _c[0]) === null || _d === void 0 ? void 0 : _d.id;
-                if (firstCommitSha) {
-                    try {
-                        let parentShaOutput = '';
-                        await exec.exec('git', ['rev-parse', `${firstCommitSha}^`], {
-                            listeners: { stdout: (data) => { parentShaOutput += data.toString(); } },
-                            ignoreReturnCode: true
-                        });
-                        baseSha = parentShaOutput.trim();
-                        if (!baseSha)
-                            core.warning("Could not determine parent SHA for new branch's first commit.");
-                    }
-                    catch (e) {
-                        core.warning(`Could not get parent of first commit ${firstCommitSha} for new branch: ${e.message}`);
-                    }
+exports.generatePrDescription = generatePrDescription;
+/**
+ * Generates a detailed PR description that includes a summary of all translation changes.
+ * @param basePrBody The base PR body text from configuration
+ * @param translationChanges Object containing arrays of added, updated, and removed translations
+ * @param targetLanguages Array of target language codes
+ * @param changedFilesList Array of files that were modified
+ * @returns Complete PR description with detailed change summary
+ */
+function generatePrDescription(basePrBody, translationChanges, targetLanguages, changedFilesList) {
+    let finalPrBody = basePrBody;
+    // Add detailed translation changes summary
+    if (translationChanges && targetLanguages) {
+        const totalChanges = translationChanges.added.length + translationChanges.updated.length + translationChanges.staleRemoved.length;
+        if (totalChanges > 0) {
+            finalPrBody += '\n\n## Translation Changes Summary\n\n';
+            finalPrBody += `**Target Languages:** ${targetLanguages.join(', ')}\n`;
+            finalPrBody += `**Total Changes:** ${totalChanges}\n\n`;
+            if (translationChanges.added.length > 0) {
+                finalPrBody += `### ✅ Added Translations (${translationChanges.added.length})\n`;
+                for (const change of translationChanges.added) {
+                    finalPrBody += `- ${change}\n`;
                 }
-                else {
-                    core.warning('Could not determine first commit SHA for new branch push with zero base SHA.');
-                }
+                finalPrBody += '\n';
             }
-            break;
-        default:
-            throw new Error(`Unsupported event: ${context.eventName}.`);
+            if (translationChanges.updated.length > 0) {
+                finalPrBody += `### 🔄 Updated Translations (${translationChanges.updated.length})\n`;
+                for (const change of translationChanges.updated) {
+                    finalPrBody += `- ${change}\n`;
+                }
+                finalPrBody += '\n';
+            }
+            if (translationChanges.staleRemoved.length > 0) {
+                finalPrBody += `### 🗑️ Removed Stale Strings (${translationChanges.staleRemoved.length})\n`;
+                for (const change of translationChanges.staleRemoved) {
+                    finalPrBody += `- ${change}\n`;
+                }
+                finalPrBody += '\n';
+            }
+        }
     }
-    if (!baseSha || !headSha || /^0+$/.test(headSha)) {
-        throw new Error(`Could not determine valid base or head SHA. Base: '${baseSha}', Head: '${headSha}'.`);
+    if (changedFilesList && changedFilesList.length > 0) {
+        finalPrBody += `\n**Updated files:**\n- ${changedFilesList.join('\n- ')}`;
     }
-    return { baseSha, headSha };
-}
-async function getFileContentAtCommit(sha, filePath) {
-    let content = '';
-    const options = {};
-    options.listeners = {
-        stdout: (data) => { content += data.toString(); },
-        stderr: (data) => { core.error(data.toString()); }
-    };
-    options.ignoreReturnCode = true;
-    const exitCode = await exec.exec('git', ['show', `${sha}:${filePath}`], options);
-    if (exitCode !== 0) {
-        core.warning(`File ${filePath} not found at commit ${sha} or git show failed.`);
-        return null;
-    }
-    return content;
+    return finalPrBody;
 }
 
 
 /***/ }),
 
-/***/ 5711:
-/***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
+/***/ 1414:
+/***/ ((__unused_webpack_module, exports) => {
 
 "use strict";
 
-var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    var desc = Object.getOwnPropertyDescriptor(m, k);
-    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
-      desc = { enumerable: true, get: function() { return m[k]; } };
-    }
-    Object.defineProperty(o, k2, desc);
-}) : (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    o[k2] = m[k];
-}));
-var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
-    Object.defineProperty(o, "default", { enumerable: true, value: v });
-}) : function(o, v) {
-    o["default"] = v;
-});
-var __importStar = (this && this.__importStar) || (function () {
-    var ownKeys = function(o) {
-        ownKeys = Object.getOwnPropertyNames || function (o) {
-            var ar = [];
-            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
-            return ar;
-        };
-        return ownKeys(o);
-    };
-    return function (mod) {
-        if (mod && mod.__esModule) return mod;
-        var result = {};
-        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
-        __setModuleDefault(result, mod);
-        return result;
-    };
-})();
 Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.fetchBatchTranslations = fetchBatchTranslations;
-const core = __importStar(__nccwpck_require__(7484));
-const openaiService_1 = __nccwpck_require__(2053);
+exports.analyzeStringsForTranslation = analyzeStringsForTranslation;
 /**
- * Fetches translations for multiple strings in a single batch API call.
- * @param requests Array of translation requests.
- * @param sourceLanguageCode The source language code (e.g., "en").
- * @param model The OpenAI model to use for translations.
- * @returns A promise that resolves to the batch translation response.
+ * Analyzes XCStrings data to identify strings that need translation and prepares translation requests.
+ * This is the core business logic that determines what translations are needed.
+ *
+ * @param xcstringsData The parsed XCStrings data
+ * @param targetLanguages Array of target language codes to translate to
+ * @returns Analysis result containing translation requests and change tracking
  */
-async function fetchBatchTranslations(requests, sourceLanguageCode = "en", model) {
-    core.info(`Fetching batch translations for ${requests.length} strings from ${sourceLanguageCode} using model ${model}.`);
-    const openaiService = new openaiService_1.OpenAIService(model);
-    try {
-        const batchResponse = await openaiService.getBatchTranslations(requests, sourceLanguageCode);
-        return batchResponse;
+function analyzeStringsForTranslation(xcstringsData, targetLanguages) {
+    var _a, _b;
+    // Create a deep copy to avoid modifying the original
+    const modifiedXcstringsData = JSON.parse(JSON.stringify(xcstringsData));
+    const translationRequests = [];
+    const translationChanges = {
+        added: [],
+        updated: [],
+        staleRemoved: []
+    };
+    const stringTranslationMap = new Map();
+    let xcstringsModified = false;
+    for (const key in modifiedXcstringsData.strings) {
+        const currentStringEntry = modifiedXcstringsData.strings[key];
+        // Initialize localizations if not present
+        if (!currentStringEntry.localizations) {
+            currentStringEntry.localizations = {};
+        }
+        // Remove stale entries
+        if (currentStringEntry.extractionState === 'stale') {
+            delete modifiedXcstringsData.strings[key];
+            xcstringsModified = true;
+            translationChanges.staleRemoved.push(key);
+            continue;
+        }
+        // Skip strings marked as shouldTranslate=false
+        if (currentStringEntry.shouldTranslate === false) {
+            continue;
+        }
+        const languagesNeeded = [];
+        const isNewMap = new Map();
+        // Check each target language to see if translation is needed
+        for (const lang of targetLanguages) {
+            const needsTranslationForLang = !currentStringEntry.localizations[lang] ||
+                !((_a = currentStringEntry.localizations[lang]) === null || _a === void 0 ? void 0 : _a.stringUnit) ||
+                !((_b = currentStringEntry.localizations[lang]) === null || _b === void 0 ? void 0 : _b.stringUnit.value);
+            if (needsTranslationForLang) {
+                const isNewTranslation = !currentStringEntry.localizations[lang];
+                languagesNeeded.push(lang);
+                isNewMap.set(lang, isNewTranslation);
+                // Initialize the localization structure if it doesn't exist
+                if (!currentStringEntry.localizations[lang]) {
+                    currentStringEntry.localizations[lang] = {
+                        stringUnit: { state: 'translated', value: '' }
+                    };
+                }
+            }
+        }
+        // If any languages need translation, add to requests
+        if (languagesNeeded.length > 0) {
+            translationRequests.push({
+                key: key,
+                text: key,
+                targetLanguages: languagesNeeded
+            });
+            stringTranslationMap.set(key, { languages: languagesNeeded, isNew: isNewMap });
+        }
     }
-    catch (error) {
-        core.error(`Error fetching batch translations: ${error instanceof Error ? error.message : String(error)}`);
-        throw error;
-    }
+    return {
+        translationRequests,
+        translationChanges,
+        stringTranslationMap,
+        modifiedXcstringsData,
+        xcstringsModified
+    };
 }
 
 
@@ -35895,9 +35813,9 @@ var __importStar = (this && this.__importStar) || (function () {
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 const core = __importStar(__nccwpck_require__(7484));
 const fs = __importStar(__nccwpck_require__(9896));
-const localizationManager_1 = __nccwpck_require__(5711);
-const githubService_1 = __nccwpck_require__(2345);
-const stringAnalyzer_1 = __nccwpck_require__(6172);
+const localizationManager_1 = __nccwpck_require__(7240);
+const githubService_1 = __nccwpck_require__(9922);
+const stringAnalyzer_1 = __nccwpck_require__(1414);
 /**
  * Formats JSON to match Xcode's xcstrings formatting style with spaces before colons.
  * @param obj The object to stringify
@@ -36062,7 +35980,230 @@ run();
 
 /***/ }),
 
-/***/ 2053:
+/***/ 9922:
+/***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
+
+"use strict";
+
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.createPullRequest = createPullRequest;
+exports.getShaRefs = getShaRefs;
+exports.getFileContentAtCommit = getFileContentAtCommit;
+const core = __importStar(__nccwpck_require__(7484));
+const github = __importStar(__nccwpck_require__(3228));
+const exec = __importStar(__nccwpck_require__(5236));
+const prDescriptionGenerator_1 = __nccwpck_require__(8076);
+async function createPullRequest(xcstringsFilePath, changedFilesList, token, prConfig, translationChanges, targetLanguages) {
+    var _a;
+    const context = github.context;
+    await exec.exec('git', ['config', '--global', 'user.name', prConfig.commitUserName]);
+    await exec.exec('git', ['config', '--global', 'user.email', prConfig.commitUserEmail]);
+    const newBranchName = `${prConfig.branchPrefix}${context.eventName}-${context.runId}-${Date.now()}`.replace(/\//g, '-');
+    core.info(`Creating new branch: ${newBranchName}`);
+    await exec.exec('git', ['checkout', '-b', newBranchName]);
+    core.info('Adding file to commit...');
+    await exec.exec('git', ['add', xcstringsFilePath]);
+    core.info('Committing changes...');
+    await exec.exec('git', ['commit', '-m', prConfig.commitMessage]);
+    core.info('Pushing new branch...');
+    await exec.exec('git', ['push', '-u', 'origin', newBranchName]);
+    const octokit = github.getOctokit(token);
+    const repoOwner = context.repo.owner;
+    const repoName = context.repo.repo;
+    let baseBranchForPR = context.ref.replace('refs/heads/', '');
+    if (context.eventName === 'pull_request') {
+        baseBranchForPR = (_a = context.payload.pull_request) === null || _a === void 0 ? void 0 : _a.base.ref;
+        if (!baseBranchForPR) {
+            core.setFailed('Could not determine base branch from pull request context for PR creation.');
+            return;
+        }
+    }
+    core.info(`Base branch for PR will be: ${baseBranchForPR}`);
+    const finalPrBody = (0, prDescriptionGenerator_1.generatePrDescription)(prConfig.prBody, translationChanges, targetLanguages, changedFilesList);
+    core.info(`Creating pull request: ${prConfig.prTitle}`);
+    try {
+        const response = await octokit.rest.pulls.create({
+            owner: repoOwner,
+            repo: repoName,
+            title: prConfig.prTitle,
+            head: newBranchName,
+            base: baseBranchForPR,
+            body: finalPrBody,
+            draft: false
+        });
+        core.info(`Pull request created: ${response.data.html_url}`);
+    }
+    catch (e) {
+        core.error('Error creating pull request:');
+        if (e.response) {
+            core.error(`Status: ${e.response.status}`);
+            core.error(`Data: ${JSON.stringify(e.response.data)}`);
+        }
+        core.setFailed(e.message);
+    }
+}
+async function getShaRefs() {
+    var _a, _b, _c, _d;
+    const context = github.context;
+    let baseSha = '';
+    let headSha = '';
+    switch (context.eventName) {
+        case 'pull_request':
+            baseSha = (_a = context.payload.pull_request) === null || _a === void 0 ? void 0 : _a.base.sha;
+            headSha = (_b = context.payload.pull_request) === null || _b === void 0 ? void 0 : _b.head.sha;
+            break;
+        case 'push':
+            baseSha = context.payload.before;
+            headSha = context.payload.after;
+            if (/^0+$/.test(baseSha)) {
+                core.info('New branch push detected. Comparing against parent of HEAD.');
+                const firstCommitSha = (_d = (_c = context.payload.commits) === null || _c === void 0 ? void 0 : _c[0]) === null || _d === void 0 ? void 0 : _d.id;
+                if (firstCommitSha) {
+                    try {
+                        let parentShaOutput = '';
+                        await exec.exec('git', ['rev-parse', `${firstCommitSha}^`], {
+                            listeners: { stdout: (data) => { parentShaOutput += data.toString(); } },
+                            ignoreReturnCode: true
+                        });
+                        baseSha = parentShaOutput.trim();
+                        if (!baseSha)
+                            core.warning("Could not determine parent SHA for new branch's first commit.");
+                    }
+                    catch (e) {
+                        core.warning(`Could not get parent of first commit ${firstCommitSha} for new branch: ${e.message}`);
+                    }
+                }
+                else {
+                    core.warning('Could not determine first commit SHA for new branch push with zero base SHA.');
+                }
+            }
+            break;
+        default:
+            throw new Error(`Unsupported event: ${context.eventName}.`);
+    }
+    if (!baseSha || !headSha || /^0+$/.test(headSha)) {
+        throw new Error(`Could not determine valid base or head SHA. Base: '${baseSha}', Head: '${headSha}'.`);
+    }
+    return { baseSha, headSha };
+}
+async function getFileContentAtCommit(sha, filePath) {
+    let content = '';
+    const options = {};
+    options.listeners = {
+        stdout: (data) => { content += data.toString(); },
+        stderr: (data) => { core.error(data.toString()); }
+    };
+    options.ignoreReturnCode = true;
+    const exitCode = await exec.exec('git', ['show', `${sha}:${filePath}`], options);
+    if (exitCode !== 0) {
+        core.warning(`File ${filePath} not found at commit ${sha} or git show failed.`);
+        return null;
+    }
+    return content;
+}
+
+
+/***/ }),
+
+/***/ 7240:
+/***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
+
+"use strict";
+
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.fetchBatchTranslations = fetchBatchTranslations;
+const core = __importStar(__nccwpck_require__(7484));
+const openaiService_1 = __nccwpck_require__(8393);
+/**
+ * Fetches translations for multiple strings in a single batch API call.
+ * @param requests Array of translation requests.
+ * @param sourceLanguageCode The source language code (e.g., "en").
+ * @param model The OpenAI model to use for translations.
+ * @returns A promise that resolves to the batch translation response.
+ */
+async function fetchBatchTranslations(requests, sourceLanguageCode = "en", model) {
+    core.info(`Fetching batch translations for ${requests.length} strings from ${sourceLanguageCode} using model ${model}.`);
+    const openaiService = new openaiService_1.OpenAIService(model);
+    try {
+        const batchResponse = await openaiService.getBatchTranslations(requests, sourceLanguageCode);
+        return batchResponse;
+    }
+    catch (error) {
+        core.error(`Error fetching batch translations: ${error instanceof Error ? error.message : String(error)}`);
+        throw error;
+    }
+}
+
+
+/***/ }),
+
+/***/ 8393:
 /***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
 
 "use strict";
@@ -36213,147 +36354,6 @@ Return the translations in the exact JSON structure specified.`;
     }
 }
 exports.OpenAIService = OpenAIService;
-
-
-/***/ }),
-
-/***/ 898:
-/***/ ((__unused_webpack_module, exports) => {
-
-"use strict";
-
-Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.generatePrDescription = generatePrDescription;
-/**
- * Generates a detailed PR description that includes a summary of all translation changes.
- * @param basePrBody The base PR body text from configuration
- * @param translationChanges Object containing arrays of added, updated, and removed translations
- * @param targetLanguages Array of target language codes
- * @param changedFilesList Array of files that were modified
- * @returns Complete PR description with detailed change summary
- */
-function generatePrDescription(basePrBody, translationChanges, targetLanguages, changedFilesList) {
-    let finalPrBody = basePrBody;
-    // Add detailed translation changes summary
-    if (translationChanges && targetLanguages) {
-        const totalChanges = translationChanges.added.length + translationChanges.updated.length + translationChanges.staleRemoved.length;
-        if (totalChanges > 0) {
-            finalPrBody += '\n\n## Translation Changes Summary\n\n';
-            finalPrBody += `**Target Languages:** ${targetLanguages.join(', ')}\n`;
-            finalPrBody += `**Total Changes:** ${totalChanges}\n\n`;
-            if (translationChanges.added.length > 0) {
-                finalPrBody += `### ✅ Added Translations (${translationChanges.added.length})\n`;
-                for (const change of translationChanges.added) {
-                    finalPrBody += `- ${change}\n`;
-                }
-                finalPrBody += '\n';
-            }
-            if (translationChanges.updated.length > 0) {
-                finalPrBody += `### 🔄 Updated Translations (${translationChanges.updated.length})\n`;
-                for (const change of translationChanges.updated) {
-                    finalPrBody += `- ${change}\n`;
-                }
-                finalPrBody += '\n';
-            }
-            if (translationChanges.staleRemoved.length > 0) {
-                finalPrBody += `### 🗑️ Removed Stale Strings (${translationChanges.staleRemoved.length})\n`;
-                for (const change of translationChanges.staleRemoved) {
-                    finalPrBody += `- ${change}\n`;
-                }
-                finalPrBody += '\n';
-            }
-        }
-    }
-    if (changedFilesList && changedFilesList.length > 0) {
-        finalPrBody += `\n**Updated files:**\n- ${changedFilesList.join('\n- ')}`;
-    }
-    return finalPrBody;
-}
-
-
-/***/ }),
-
-/***/ 6172:
-/***/ ((__unused_webpack_module, exports) => {
-
-"use strict";
-
-Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.analyzeStringsForTranslation = analyzeStringsForTranslation;
-/**
- * Analyzes XCStrings data to identify strings that need translation and prepares translation requests.
- * This is the core business logic that determines what translations are needed.
- *
- * @param xcstringsData The parsed XCStrings data
- * @param targetLanguages Array of target language codes to translate to
- * @returns Analysis result containing translation requests and change tracking
- */
-function analyzeStringsForTranslation(xcstringsData, targetLanguages) {
-    var _a, _b;
-    // Create a deep copy to avoid modifying the original
-    const modifiedXcstringsData = JSON.parse(JSON.stringify(xcstringsData));
-    const translationRequests = [];
-    const translationChanges = {
-        added: [],
-        updated: [],
-        staleRemoved: []
-    };
-    const stringTranslationMap = new Map();
-    let xcstringsModified = false;
-    for (const key in modifiedXcstringsData.strings) {
-        const currentStringEntry = modifiedXcstringsData.strings[key];
-        // Initialize localizations if not present
-        if (!currentStringEntry.localizations) {
-            currentStringEntry.localizations = {};
-        }
-        // Remove stale entries
-        if (currentStringEntry.extractionState === 'stale') {
-            delete modifiedXcstringsData.strings[key];
-            xcstringsModified = true;
-            translationChanges.staleRemoved.push(key);
-            continue;
-        }
-        // Skip strings marked as shouldTranslate=false
-        if (currentStringEntry.shouldTranslate === false) {
-            continue;
-        }
-        const languagesNeeded = [];
-        const isNewMap = new Map();
-        // Check each target language to see if translation is needed
-        for (const lang of targetLanguages) {
-            const needsTranslationForLang = !currentStringEntry.localizations[lang] ||
-                !((_a = currentStringEntry.localizations[lang]) === null || _a === void 0 ? void 0 : _a.stringUnit) ||
-                !((_b = currentStringEntry.localizations[lang]) === null || _b === void 0 ? void 0 : _b.stringUnit.value);
-            if (needsTranslationForLang) {
-                const isNewTranslation = !currentStringEntry.localizations[lang];
-                languagesNeeded.push(lang);
-                isNewMap.set(lang, isNewTranslation);
-                // Initialize the localization structure if it doesn't exist
-                if (!currentStringEntry.localizations[lang]) {
-                    currentStringEntry.localizations[lang] = {
-                        stringUnit: { state: 'translated', value: '' }
-                    };
-                }
-            }
-        }
-        // If any languages need translation, add to requests
-        if (languagesNeeded.length > 0) {
-            translationRequests.push({
-                key: key,
-                text: key,
-                targetLanguages: languagesNeeded
-            });
-            stringTranslationMap.set(key, { languages: languagesNeeded, isNew: isNewMap });
-        }
-    }
-    return {
-        translationRequests,
-        translationChanges,
-        stringTranslationMap,
-        modifiedXcstringsData,
-        xcstringsModified
-    };
-}
 
 
 /***/ }),

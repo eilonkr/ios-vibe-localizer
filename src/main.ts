@@ -1,9 +1,9 @@
 import * as core from '@actions/core';
 import * as fs from 'fs';
-import { fetchBatchTranslations } from './localizationManager';
+import { fetchBatchTranslations } from './services/localizationManager';
 import { XCStrings, TranslationRequest } from './types';
-import { createPullRequest, getShaRefs, getFileContentAtCommit, PrConfig } from './githubService';
-import { analyzeStringsForTranslation } from './stringAnalyzer';
+import { createPullRequest, getShaRefs, getFileContentAtCommit, PrConfig } from './services/githubService';
+import { analyzeStringsForTranslation } from './helpers/stringAnalyzer';
 
 /**
  * Formats JSON to match Xcode's xcstrings formatting style with spaces before colons.

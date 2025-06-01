@@ -1,6 +1,6 @@
 import * as core from '@actions/core';
 import OpenAI from 'openai';
-import { TranslationRequest, BatchTranslationResponse } from './types';
+import { TranslationRequest, BatchTranslationResponse } from '../types';
 
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY || "";
 

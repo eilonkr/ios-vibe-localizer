@@ -1,4 +1,4 @@
-import { XCStrings, TranslationRequest } from './types';
+import { XCStrings, TranslationRequest } from '../types';
 
 export interface StringAnalysisResult {
   translationRequests: TranslationRequest[];
