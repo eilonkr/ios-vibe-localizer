@@ -12,14 +12,14 @@ This GitHub Action leverages OpenAI's Completions API to automatically and conti
 
 ## Features
 
-- **Automated Translation**: Translates missing strings in your String Catalog (`.xcstrings`) files using OpenAI's Completions API
-- **Smart Detection**: Only translates strings that are missing or need updates
-- **Batch Processing**: Efficiently processes multiple strings and languages in single API calls
-- **Comment Support**: Uses String Catalog comments as context for more accurate translations
-- **Selective Translation**: Respects `shouldTranslate: false` ('DON'T TRANSLATE') flag to skip specific strings
-- **Stale Cleanup**: Automatically removes outdated strings marked as `stale`
-- **Pull Request Integration**: Creates organized PRs with detailed change summaries
-- **Placeholder Preservation**: Maintains string interpolation placeholders (e.g., `%@`, `%d`) in translations
+🤖 **Automated Translation**: Translates missing strings in your String Catalog (`.xcstrings`) files using OpenAI's Completions API
+🔍 **Smart Detection**: Only translates strings that are missing or need updates
+📦 **Batch Processing**: Efficiently processes multiple strings and languages in single API calls
+💭 **Comment Support**: Uses String Catalog comments as context for more accurate translations
+⚡ **Selective Translation**: Respects `shouldTranslate: false` ('DON'T TRANSLATE') flag to skip specific strings
+🧹 **Stale Cleanup**: Automatically removes outdated strings marked as `stale`
+🔀 **Pull Request Integration**: Creates organized PRs with detailed change summaries
+🔤 **Placeholder Preservation**: Maintains string interpolation placeholders (e.g., `%@`, `%d`) in translations
 
 ## Prerequisites
 
@@ -129,8 +129,8 @@ let welcomeMessage = String(localized: "Welcome to our app!", comment: "Greeting
 
 ## Roadmap
 
-- **Additional LLM Providers**: Support for Claude, DeepSeek, and other language models
-- **Multiple Catalog Tables**: Support for multiple string tables within a single catalog ([learn more](https://developer.apple.com/documentation/xcode/localizing-and-varying-text-with-a-string-catalog))
+🤖 **Additional LLM Providers**: Support for Claude, DeepSeek, and other language models
+📚 **Multiple Catalog Tables**: Support for multiple string tables within a single catalog ([learn more](https://developer.apple.com/documentation/xcode/localizing-and-varying-text-with-a-string-catalog))
 
 ## Contributing
 

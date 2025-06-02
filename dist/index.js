@@ -35755,7 +35755,8 @@ function analyzeStringsForTranslation(xcstringsData, targetLanguages) {
             translationRequests.push({
                 key: key,
                 text: key,
-                targetLanguages: languagesNeeded
+                targetLanguages: languagesNeeded,
+                comment: currentStringEntry.comment
             });
             stringTranslationMap.set(key, { languages: languagesNeeded, isNew: isNewMap });
         }
@@ -36316,10 +36317,18 @@ class OpenAIService {
             required: ["translations"],
             additionalProperties: false
         };
-        const stringsToTranslate = requests.map(req => `Key: "${req.key}"\nText: "${req.text}"`).join('\n\n');
+        const stringsToTranslate = requests.map(req => {
+            let entry = `Key: "${req.key}"\nText: "${req.text}"`;
+            if (req.comment) {
+                entry += `\nContext: "${req.comment}"`;
+            }
+            return entry;
+        }).join('\n\n');
         const systemPrompt = `You are a professional translator. Translate the following strings from ${sourceLanguage} to the specified target languages: ${allTargetLanguages.join(', ')}.
 
 For each string, provide accurate, natural translations that preserve the meaning and context. If a string contains placeholders (like %@, %d, {0}, etc.), keep them exactly as they are in the translation.
+
+When a Context is provided, use it to inform your translation choices for better accuracy and appropriateness.
 
 Return the translations in the exact JSON structure specified.`;
         const userPrompt = `Translate these strings:\n\n${stringsToTranslate}`;
