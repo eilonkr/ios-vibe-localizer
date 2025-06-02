@@ -86,7 +86,8 @@ export function analyzeStringsForTranslation(
       translationRequests.push({
         key: key,
         text: key,
-        targetLanguages: languagesNeeded
+        targetLanguages: languagesNeeded,
+        comment: currentStringEntry.comment
       });
       stringTranslationMap.set(key, { languages: languagesNeeded, isNew: isNewMap });
     }

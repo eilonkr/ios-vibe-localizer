@@ -22,6 +22,7 @@ export interface TranslationRequest {
   key: string;
   text: string;
   targetLanguages: string[];
+  comment?: string;
 }
 
 export interface TranslationResult {
