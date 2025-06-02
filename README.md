@@ -6,7 +6,7 @@ A GitHub Action that automatically translates iOS String Catalogs using OpenAI's
 
 ## Overview
 
-Xcode 15 introduced [String Catalogs](https://developer.apple.com/documentation/xcode/localizing-and-varying-text-with-a-string-catalog) – a new unified, auto-updating translations file designed as an alternative to the legacy `.strings` files pattern.
+Xcode 15 introduced [String Catalogs](https://developer.apple.com/documentation/xcode/localizing-and-varying-text-with-a-string-catalog) – a new unified, auto-updating translations file designed to set an alternative to the legacy `.strings` files pattern.
 
 This GitHub Action leverages OpenAI's Completions API to automatically and continuously keep your string catalogs up-to-date with translations across multiple languages.
 
