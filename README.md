@@ -145,6 +145,8 @@ Consider using this action judiciously by:
 
 📚 **Multiple Catalog Tables**: Support for multiple string tables within a single catalog ([learn more](https://developer.apple.com/documentation/xcode/localizing-and-varying-text-with-a-string-catalog))
 
+👥 **Pluralization Support**
+
 ## Contributing
 
 This project welcomes contributions! Feel free to open a pull request for any of the roadmap features or other improvements you think would be useful.
