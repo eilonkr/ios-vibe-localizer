@@ -129,7 +129,7 @@ let welcomeMessage = String(localized: "Welcome to our app!", comment: "Greeting
 
 ## Important Considerations
 
-⚠️ **AI Token Usage and Costs**: This action uses OpenAI's API to generate translations, which may consume significant tokens depending on the number of strings and target languages. While optimized, translation costs can accumulate quickly, especially for large projects or frequent updates. 
+⚠️ **AI Token Usage and Costs**: This action uses OpenAI's API to generate translations, which may consume significant tokens depending on the number of strings and target languages. While optimized, translation costs can accumulate quickly, especially for large projects, frequent updates or expensive model selection. 
 
 **The developer of this action is not responsible for any OpenAI API charges incurred through its use.** Please monitor your OpenAI usage and set appropriate billing limits in your OpenAI account to avoid unexpected charges.
 
