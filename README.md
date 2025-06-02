@@ -1,3 +1,5 @@
+![tmpzd27i57w](https://github.com/user-attachments/assets/6c3c3049-8d56-488b-85e9-2597209a7116)
+
 # iOS Localizer
 
 A GitHub Action that automatically translates iOS String Catalogs using OpenAI's GPT models.
