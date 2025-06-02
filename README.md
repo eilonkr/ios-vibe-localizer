@@ -2,7 +2,7 @@
 
 # iOS AI Localizer
 
-A GitHub Action that automatically translates iOS String Catalogs using OpenAI's GPT models.
+A GitHub Action that automatically translates string catalogs using OpenAI's Completions API.
 
 ## Overview
 
@@ -153,6 +153,6 @@ This project welcomes contributions! Feel free to open a pull request for any of
 
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+This project is licensed under the MIT License - see [LICENSE](LICENSE) for details.
 
 
