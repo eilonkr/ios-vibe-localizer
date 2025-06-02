@@ -127,6 +127,19 @@ let welcomeMessage = String(localized: "Welcome to our app!", comment: "Greeting
 
 **Important**: Make sure to build your project with Xcode after adding new strings to ensure your string catalog is synchronized with your project's localizable strings.
 
+## Important Considerations
+
+⚠️ **AI Token Usage and Costs**: This action uses OpenAI's API to generate translations, which may consume significant tokens depending on the number of strings and target languages. While optimized, translation costs can accumulate quickly, especially for large projects or frequent updates. 
+
+**The developer of this action is not responsible for any OpenAI API charges incurred through its use.** Please monitor your OpenAI usage and set appropriate billing limits in your OpenAI account to avoid unexpected charges.
+
+Consider using this action judiciously by:
+- Testing with a small subset of languages first
+- Setting up OpenAI usage alerts
+- Reviewing the number of strings to be translated before running the action
+- Using specific file paths rather than translating entire catalogs when possible
+
+
 ## Roadmap
 
 🤖 **Additional LLM Providers**: Support for Claude, DeepSeek, and other language models
