@@ -36,11 +36,10 @@ name: iOS Localizer
 
 on:
   push:
-    branches: [ main ]
-    paths: [ '**/*.xcstrings' ]
+    branches:
+        - main
   pull_request:
-    branches: [ main ]
-    paths: [ '**/*.xcstrings' ]
+        - main
 
 jobs:
   localize:
@@ -52,7 +51,7 @@ jobs:
           fetch-depth: 0
 
       - name: iOS Localizer
-        uses: your-username/ios-localizer@v1
+        uses: eilonkr/ios-localizer-action@v1
         with:
           xcstrings_file_path: 'Localizable.xcstrings'
           target_languages: 'es,fr,de,ja,zh-Hans'
@@ -84,7 +83,7 @@ jobs:
 Any literal string in SwiftUI text components will be automatically added to the string catalog (`.xcstrings`) file:
 
 ```swift
-Text("The sunrise was particularly beautiful today.")
+Text("The sunrise was particularly beautiful today.") // Will be added to the string catalog
 ```
 
 To provide context for the translation API, add comments that will be reflected in the string catalog and used as context for translations:
