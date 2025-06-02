@@ -39,7 +39,7 @@ on:
   push:
     branches:
         - main
-  pull_request:
+    pull_request:
         - main
 
 jobs:
