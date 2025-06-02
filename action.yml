@@ -1,7 +1,7 @@
-name: 'iOS Localizer'
+name: 'iOS AI Localizer'
 description: >
-  iOS Localizer is a GitHub Action that automates the translation of iOS app strings using OpenAI's GPT models.
-author: 'iOS Localizer'
+  iOS AI Localizer is a GitHub Action that automates the translation of iOS app strings using OpenAI's GPT models.
+author: 'iOS AI Localizer'
 
 inputs:
   xcstrings_file_path:
@@ -29,15 +29,15 @@ inputs:
   commit_message:
     description: 'Commit message for localization updates.'
     required: false
-    default: 'i18n: Update translations by iOS Localizer Action'
+    default: 'i18n: Update translations by iOS AI Localizer Action'
   pr_title:
     description: 'Title for the pull request.'
     required: false
-    default: 'iOS Localizer: Automated Localization Updates'
+    default: 'iOS AI Localizer: Automated Localization Updates'
   pr_body:
     description: 'Body content for the pull request.'
     required: false
-    default: 'Automated localization updates by the iOS Localizer Action.'
+    default: 'Automated localization updates by the iOS AI Localizer Action.'
   openai_model:
     description: 'OpenAI model to use for translations.'
     required: false

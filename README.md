@@ -1,6 +1,6 @@
 ![tmpzd27i57w](https://github.com/user-attachments/assets/6c3c3049-8d56-488b-85e9-2597209a7116)
 
-# iOS Localizer
+# iOS AI Localizer
 
 A GitHub Action that automatically translates iOS String Catalogs using OpenAI's GPT models.
 
@@ -34,7 +34,7 @@ Before using this action, you'll need:
 Add the following workflow file to your iOS project at `.github/workflows/ios-localizer.yml`:
 
 ```yaml
-name: iOS Localizer
+name: iOS AI Localizer
 on:
   push:
     branches:
@@ -51,7 +51,7 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: iOS Localizer
+      - name: iOS AI Localizer
         uses: eilonkr/ios-localizer-action@v1
         with:
           xcstrings_file_path: 'Localizable.xcstrings' # Path to your String Catalog in your project
@@ -72,9 +72,9 @@ jobs:
 | `pr_branch_prefix` | No | `ios-localizer-updates/` | Prefix for PR branch names |
 | `commit_user_name` | No | `github-actions[bot]` | Git commit author name |
 | `commit_user_email` | No | `github-actions[bot]@users.noreply.github.com` | Git commit author email |
-| `commit_message` | No | `i18n: Update translations by iOS Localizer Action` | Commit message |
-| `pr_title` | No | `iOS Localizer: Automated Localization Updates` | Pull request title |
-| `pr_body` | No | `Automated localization updates by the iOS Localizer Action.` | Pull request body |
+| `commit_message` | No | `i18n: Update translations by iOS AI Localizer Action` | Commit message |
+| `pr_title` | No | `iOS AI Localizer: Automated Localization Updates` | Pull request title |
+| `pr_body` | No | `Automated localization updates by the iOS AI Localizer Action.` | Pull request body |
 | `openai_model` | No | `gpt-4o-mini` | OpenAI model to use |
 
 ## Working with String Catalogs
