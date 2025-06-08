@@ -71,7 +71,7 @@ jobs:
 | `target_languages` | Yes | - | Comma-separated language codes (e.g., `es,fr,de`) |
 | `github_token` | Yes | - | GitHub token for creating PRs |
 | `openai_model` | No | `gpt-4o-mini` | OpenAI model to use |
-| `base_system_prompt` | No | `` | Additional system prompt for providing context to the LLM |
+| `base_system_prompt` | No | None | Additional system prompt for providing context to the LLM |
 | `pr_branch_prefix` | No | `ios-localizer-updates/` | Prefix for PR branch names |
 | `commit_user_name` | No | `github-actions[bot]` | Git commit author name |
 | `commit_user_email` | No | `github-actions[bot]@users.noreply.github.com` | Git commit author email |
