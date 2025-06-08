@@ -22,10 +22,14 @@ async function run(): Promise<void> {
     const targetLanguagesInput = core.getInput('target_languages', { required: true });
     const targetLanguages = targetLanguagesInput.split(',').map(lang => lang.trim()).filter(lang => lang);
     const openaiModel = core.getInput('openai_model', { required: false }) || 'gpt-4o-mini';
+    const baseSystemPrompt = core.getInput('base_system_prompt', { required: false }) || '';
 
     core.info(`XCStrings file: ${xcstringsFilePath}`);
     core.info(`Target languages: ${targetLanguages.join(', ')}`);
     core.info(`OpenAI model: ${openaiModel}`);
+    if (baseSystemPrompt) {
+      core.info(`Base system prompt: ${baseSystemPrompt}`);
+    }
 
     if (targetLanguages.length === 0) {
       core.setFailed('No target languages specified.');
@@ -68,7 +72,7 @@ async function run(): Promise<void> {
     if (translationRequests.length > 0) {
       core.info(`Found ${translationRequests.length} strings requiring translation. Processing in batch...`);
 
-      const batchResponse = await fetchBatchTranslations(translationRequests, updatedXcstringsData.sourceLanguage, openaiModel);
+      const batchResponse = await fetchBatchTranslations(translationRequests, updatedXcstringsData.sourceLanguage, openaiModel, baseSystemPrompt);
 
       for (const translationResult of batchResponse.translations) {
         const key = translationResult.key;
@@ -152,6 +156,9 @@ async function run(): Promise<void> {
     core.info(`Files processed: ${xcstringsFilePath}`);
     core.info(`Target languages: ${targetLanguages.join(', ')}`);
     core.info(`OpenAI model used: ${openaiModel}`);
+    if (baseSystemPrompt) {
+      core.info(`Base system prompt: ${baseSystemPrompt}`);
+    }
     
     if (translationChanges.added.length > 0 || translationChanges.updated.length > 0 || translationChanges.staleRemoved.length > 0) {
       core.info(`Translation changes:`);

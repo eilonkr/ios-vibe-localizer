@@ -28,9 +28,10 @@ export class OpenAIService {
    * Translates multiple strings to multiple target languages using OpenAI structured outputs in a single API call.
    * @param requests Array of translation requests containing key, text, and target languages.
    * @param sourceLanguage The language code of the original text (e.g., "en").
+   * @param baseSystemPrompt Additional system prompt for context.
    * @returns A promise that resolves to the batch translation response.
    */
-  async getBatchTranslations(requests: TranslationRequest[], sourceLanguage: string = "en"): Promise<BatchTranslationResponse> {
+  async getBatchTranslations(requests: TranslationRequest[], sourceLanguage: string = "en", baseSystemPrompt: string = ""): Promise<BatchTranslationResponse> {
     if (!openai) {
       throw new Error('OpenAI client not initialized. Please ensure OPENAI_API_KEY environment variable is set with a valid API key.');
     }
@@ -99,13 +100,19 @@ Return the translations in the exact JSON structure specified.`;
 
     const userPrompt = `Translate these strings:\n\n${stringsToTranslate}`;
 
+    const messages: Array<{ role: 'system' | 'user'; content: string }> = [];
+    
+    if (baseSystemPrompt.trim()) {
+      messages.push({ role: 'system', content: baseSystemPrompt.trim() });
+    }
+    
+    messages.push({ role: 'system', content: systemPrompt });
+    messages.push({ role: 'user', content: userPrompt });
+
     try {
       const chatCompletion = await openai.chat.completions.create({
         model: this.model,
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: userPrompt }
-        ],
+        messages: messages,
         response_format: {
           type: "json_schema",
           json_schema: {

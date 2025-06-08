@@ -35833,9 +35833,13 @@ async function run() {
         const targetLanguagesInput = core.getInput('target_languages', { required: true });
         const targetLanguages = targetLanguagesInput.split(',').map(lang => lang.trim()).filter(lang => lang);
         const openaiModel = core.getInput('openai_model', { required: false }) || 'gpt-4o-mini';
+        const baseSystemPrompt = core.getInput('base_system_prompt', { required: false }) || '';
         core.info(`XCStrings file: ${xcstringsFilePath}`);
         core.info(`Target languages: ${targetLanguages.join(', ')}`);
         core.info(`OpenAI model: ${openaiModel}`);
+        if (baseSystemPrompt) {
+            core.info(`Base system prompt: ${baseSystemPrompt}`);
+        }
         if (targetLanguages.length === 0) {
             core.setFailed('No target languages specified.');
             return;
@@ -35865,7 +35869,7 @@ async function run() {
         }
         if (translationRequests.length > 0) {
             core.info(`Found ${translationRequests.length} strings requiring translation. Processing in batch...`);
-            const batchResponse = await (0, localizationManager_1.fetchBatchTranslations)(translationRequests, updatedXcstringsData.sourceLanguage, openaiModel);
+            const batchResponse = await (0, localizationManager_1.fetchBatchTranslations)(translationRequests, updatedXcstringsData.sourceLanguage, openaiModel, baseSystemPrompt);
             for (const translationResult of batchResponse.translations) {
                 const key = translationResult.key;
                 const stringEntry = updatedXcstringsData.strings[key];
@@ -35941,6 +35945,9 @@ async function run() {
         core.info(`Files processed: ${xcstringsFilePath}`);
         core.info(`Target languages: ${targetLanguages.join(', ')}`);
         core.info(`OpenAI model used: ${openaiModel}`);
+        if (baseSystemPrompt) {
+            core.info(`Base system prompt: ${baseSystemPrompt}`);
+        }
         if (translationChanges.added.length > 0 || translationChanges.updated.length > 0 || translationChanges.staleRemoved.length > 0) {
             core.info(`Translation changes:`);
             if (translationChanges.added.length > 0) {
@@ -36186,13 +36193,14 @@ const openaiService_1 = __nccwpck_require__(8393);
  * @param requests Array of translation requests.
  * @param sourceLanguageCode The source language code (e.g., "en").
  * @param model The OpenAI model to use for translations.
+ * @param baseSystemPrompt Additional system prompt for context.
  * @returns A promise that resolves to the batch translation response.
  */
-async function fetchBatchTranslations(requests, sourceLanguageCode = "en", model) {
+async function fetchBatchTranslations(requests, sourceLanguageCode = "en", model, baseSystemPrompt = "") {
     core.info(`Fetching batch translations for ${requests.length} strings from ${sourceLanguageCode} using model ${model}.`);
     const openaiService = new openaiService_1.OpenAIService(model);
     try {
-        const batchResponse = await openaiService.getBatchTranslations(requests, sourceLanguageCode);
+        const batchResponse = await openaiService.getBatchTranslations(requests, sourceLanguageCode, baseSystemPrompt);
         return batchResponse;
     }
     catch (error) {
@@ -36270,9 +36278,10 @@ class OpenAIService {
      * Translates multiple strings to multiple target languages using OpenAI structured outputs in a single API call.
      * @param requests Array of translation requests containing key, text, and target languages.
      * @param sourceLanguage The language code of the original text (e.g., "en").
+     * @param baseSystemPrompt Additional system prompt for context.
      * @returns A promise that resolves to the batch translation response.
      */
-    async getBatchTranslations(requests, sourceLanguage = "en") {
+    async getBatchTranslations(requests, sourceLanguage = "en", baseSystemPrompt = "") {
         var _a, _b;
         if (!openai) {
             throw new Error('OpenAI client not initialized. Please ensure OPENAI_API_KEY environment variable is set with a valid API key.');
@@ -36332,13 +36341,16 @@ When a Context is provided, use it to inform your translation choices for better
 
 Return the translations in the exact JSON structure specified.`;
         const userPrompt = `Translate these strings:\n\n${stringsToTranslate}`;
+        const messages = [];
+        if (baseSystemPrompt.trim()) {
+            messages.push({ role: 'system', content: baseSystemPrompt.trim() });
+        }
+        messages.push({ role: 'system', content: systemPrompt });
+        messages.push({ role: 'user', content: userPrompt });
         try {
             const chatCompletion = await openai.chat.completions.create({
                 model: this.model,
-                messages: [
-                    { role: 'system', content: systemPrompt },
-                    { role: 'user', content: userPrompt }
-                ],
+                messages: messages,
                 response_format: {
                     type: "json_schema",
                     json_schema: {

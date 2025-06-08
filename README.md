@@ -57,6 +57,7 @@ jobs:
           xcstrings_file_path: 'Localizable.xcstrings' # Path to your String Catalog in your project
           target_languages: 'es,fr,de,ja,ko' # Customize as needed
           openai_model: 'gpt-4o-mini' # Customize as needed
+          base_system_prompt: 'You are translating for a fitness app. Use casual, motivational language.' # An additional system prompt for LLM context (optional)
           github_token: ${{ secrets.GITHUB_TOKEN }}
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
@@ -69,13 +70,14 @@ jobs:
 | `xcstrings_file_path` | No | `Localizable.xcstrings` | Path to your String Catalog file |
 | `target_languages` | Yes | - | Comma-separated language codes (e.g., `es,fr,de`) |
 | `github_token` | Yes | - | GitHub token for creating PRs |
+| `openai_model` | No | `gpt-4o-mini` | OpenAI model to use |
+| `base_system_prompt` | No | `` | Additional system prompt for providing context to the LLM |
 | `pr_branch_prefix` | No | `ios-localizer-updates/` | Prefix for PR branch names |
 | `commit_user_name` | No | `github-actions[bot]` | Git commit author name |
 | `commit_user_email` | No | `github-actions[bot]@users.noreply.github.com` | Git commit author email |
 | `commit_message` | No | `i18n: Update translations by iOS AI Localizer Action` | Commit message |
 | `pr_title` | No | `iOS AI Localizer: Automated Localization Updates` | Pull request title |
 | `pr_body` | No | `Automated localization updates by the iOS AI Localizer Action.` | Pull request body |
-| `openai_model` | No | `gpt-4o-mini` | OpenAI model to use |
 
 ## Working with String Catalogs
 

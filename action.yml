@@ -42,6 +42,10 @@ inputs:
     description: 'OpenAI model to use for translations.'
     required: false
     default: 'gpt-4o-mini'
+  base_system_prompt:
+    description: 'Additional system prompt to provide context for the LLM when translating strings.'
+    required: false
+    default: ''
 
 runs:
   using: 'node20'
