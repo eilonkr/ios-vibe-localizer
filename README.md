@@ -52,7 +52,7 @@ jobs:
           fetch-depth: 0
 
       - name: iOS AI Localizer
-        uses: eilonkr/ios-localizer-action@v1
+        uses: eilonkr/ios-localizer-action@v1.0.2
         with:
           xcstrings_file_path: 'Localizable.xcstrings' # Path to your String Catalog in your project
           target_languages: 'es,fr,de,ja,ko' # Customize as needed

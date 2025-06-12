@@ -39,11 +39,6 @@ export function analyzeStringsForTranslation(
   for (const key in modifiedXcstringsData.strings) {
     const currentStringEntry = modifiedXcstringsData.strings[key];
     
-    // Initialize localizations if not present
-    if (!currentStringEntry.localizations) {
-      currentStringEntry.localizations = {};
-    }
-
     // Remove stale entries
     if (currentStringEntry.extractionState === 'stale') {
       delete modifiedXcstringsData.strings[key];
@@ -55,6 +50,11 @@ export function analyzeStringsForTranslation(
     // Skip strings marked as shouldTranslate=false
     if (currentStringEntry.shouldTranslate === false) {
       continue;
+    }
+
+    // Initialize localizations if not present (only for strings that will be processed)
+    if (!currentStringEntry.localizations) {
+      currentStringEntry.localizations = {};
     }
 
     const languagesNeeded: string[] = [];
