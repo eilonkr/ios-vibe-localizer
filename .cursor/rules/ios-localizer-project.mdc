@@ -3,11 +3,11 @@ description:
 globs: 
 alwaysApply: true
 ---
-# iOS AI Localizer Project Guide
+# iOS Vibe Localization Project Guide
 
 ## Project Overview
 
-iOS AI Localizer is a GitHub Action that automates the translation of iOS app strings using OpenAI's GPT models. It processes `.xcstrings` files, identifies missing translations, generates translations via OpenAI, and creates pull requests with the updates.
+iOS Vibe Localization is a GitHub Action that automates the translation of iOS app strings using OpenAI's GPT models. It processes `.xcstrings` files, identifies missing translations, generates translations via OpenAI, and creates pull requests with the updates.
 
 ## Core Architecture
 

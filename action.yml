@@ -1,7 +1,7 @@
-name: 'iOS AI Localizer'
+name: 'iOS Vibe Localization'
 description: >
-  iOS AI Localizer is a GitHub Action that automates the translation of iOS app strings using OpenAI's GPT models.
-author: 'iOS AI Localizer'
+  A GitHub Action that translates iOS apps using AI, built on top of string catalogs.
+author: 'iOS Vibe Localization'
 
 inputs:
   xcstrings_file_path:
@@ -17,7 +17,7 @@ inputs:
   pr_branch_prefix:
     description: 'Prefix for the pull request branch name.'
     required: false
-    default: 'ios-localizer-updates/'
+    default: 'ios-vibe-localization-updates/'
   commit_user_name:
     description: 'Name for git commit user.'
     required: false
@@ -29,15 +29,15 @@ inputs:
   commit_message:
     description: 'Commit message for localization updates.'
     required: false
-    default: 'i18n: Update translations by iOS AI Localizer Action'
+    default: 'i18n: Update translations by iOS Vibe Localization Action'
   pr_title:
     description: 'Title for the pull request.'
     required: false
-    default: 'iOS AI Localizer: Automated Localization Updates'
+    default: 'iOS Vibe Localization: Automated Localization Updates'
   pr_body:
     description: 'Body content for the pull request.'
     required: false
-    default: 'Automated localization updates by the iOS AI Localizer Action.'
+    default: 'Automated localization updates by the iOS Vibe Localization Action.'
   openai_model:
     description: 'OpenAI model to use for translations.'
     required: false

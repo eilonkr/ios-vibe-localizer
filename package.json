@@ -1,7 +1,7 @@
 {
-  "name": "ios-localizer-action",
+  "name": "ios-vibe-localization",
   "version": "0.1.0",
-  "description": "A GitHub Action to print a test message.",
+  "description": "A GitHub Action for iOS app localization with AI-powered translations.",
   "main": "dist/index.js",
   "scripts": {
     "build": "ncc build src/main.ts -o dist --source-map --license licenses.txt",
