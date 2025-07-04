@@ -1,4 +1,4 @@
-![tmpzd27i57w](https://github.com/user-attachments/assets/6c3c3049-8d56-488b-85e9-2597209a7116)
+![tmpja6wch_a](https://github.com/user-attachments/assets/025e5e25-1884-4e77-ae7c-1431e2836a23)
 
 # iOS Vibe Localization
 
